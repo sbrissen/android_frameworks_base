@@ -66,6 +66,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.android.internal.telephony.BaseCommands;
+
 /**
  * {@hide}
  */
@@ -253,6 +255,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
     static final int RESPONSE_UNSOLICITED = 1;
 
     static final String SOCKET_NAME_RIL = "rild";
+	static final String SOCKET_NAME_RIL_EXT = "rildext";
 
     static final int SOCKET_OPEN_RETRY_MILLIS = 4 * 1000;
 
@@ -516,6 +519,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
     class RILReceiver implements Runnable {
         byte[] buffer;
+		int mPhoneType;
 
         RILReceiver() {
             buffer = new byte[RIL_MAX_COMMAND_BYTES];
@@ -524,7 +528,106 @@ public class RIL extends BaseCommands implements CommandsInterface {
         public void
         run() {
             int retryCount = 0;
+									
+			Log.e (LOG_TAG,"mPhoneType: " + mPhoneType);
+			if(mPhoneType == 1) {
+			try {for (;;) {
+                LocalSocket s = null;
+                LocalSocketAddress l;
 
+                try {
+                    s = new LocalSocket();
+                    l = new LocalSocketAddress(SOCKET_NAME_RIL_EXT,
+                            LocalSocketAddress.Namespace.RESERVED);
+                    s.connect(l);
+                } catch (IOException ex){
+                    try {
+                        if (s != null) {
+                            s.close();
+                        }
+                    } catch (IOException ex2) {
+                        //ignore failure to close after failure to connect
+                    }
+
+                    // don't print an error message after the the first time
+                    // or after the 8th time
+
+                    if (retryCount == 8) {
+                        Log.e (LOG_TAG,
+                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
+                            + "' socket after " + retryCount
+                            + " times, continuing to retry silently");
+                    } else if (retryCount > 0 && retryCount < 8) {
+                        Log.i (LOG_TAG,
+                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
+                            + "' socket; retrying after timeout");
+                    }
+
+                    try {
+                        Thread.sleep(SOCKET_OPEN_RETRY_MILLIS);
+                    } catch (InterruptedException er) {
+                    }
+
+                    retryCount++;
+                    continue;
+                }
+
+                retryCount = 0;
+
+                mSocket = s;
+                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL_EXT + "' socket");
+
+                int length = 0;
+                try {
+                    InputStream is = mSocket.getInputStream();
+
+                    for (;;) {
+                        Parcel p;
+
+                        length = readRilMessage(is, buffer);
+
+                        if (length < 0) {
+							SystemProperties.set("ril.rildReset","1");
+                            // End-of-stream reached
+                            break;
+                        }
+
+                        p = Parcel.obtain();
+                        p.unmarshall(buffer, 0, length);
+                        p.setDataPosition(0);
+
+                        Log.v(LOG_TAG, "Read packet: " + length + " bytes");
+
+                        processResponse(p);
+                        p.recycle();
+                    }
+                } catch (java.io.IOException ex) {
+                    Log.i(LOG_TAG, "'" + SOCKET_NAME_RIL_EXT + "' socket closed",
+                          ex);
+                } catch (Throwable tr) {
+                    Log.e(LOG_TAG, "Uncaught exception read length=" + length +
+                        "Exception:" + tr.toString());
+                }
+
+                Log.i(LOG_TAG, "Disconnected from '" + SOCKET_NAME_RIL_EXT
+                      + "' socket");
+
+                setRadioState (RadioState.RADIO_UNAVAILABLE);
+
+                try {
+                    mSocket.close();
+                } catch (IOException ex) {
+                }
+
+                mSocket = null;
+                RILRequest.resetSerial();
+
+                // Clear request list on close
+                clearRequestsList(RADIO_NOT_AVAILABLE, false);
+            }} catch (Throwable tr) {
+                Log.e(LOG_TAG,"Uncaught exception", tr);
+            }
+			}else{
             try {for (;;) {
                 LocalSocket s = null;
                 LocalSocketAddress l;
@@ -581,6 +684,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                         length = readRilMessage(is, buffer);
 
                         if (length < 0) {
+							SystemProperties.set("ril.rildReset","1");
                             // End-of-stream reached
                             break;
                         }
@@ -589,7 +693,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                         p.unmarshall(buffer, 0, length);
                         p.setDataPosition(0);
 
-                        //Log.v(LOG_TAG, "Read packet: " + length + " bytes");
+                        Log.v(LOG_TAG, "Read packet: " + length + " bytes");
 
                         processResponse(p);
                         p.recycle();
@@ -620,6 +724,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
             }} catch (Throwable tr) {
                 Log.e(LOG_TAG,"Uncaught exception", tr);
             }
+			}
 
             /* We're disconnected so we don't know the ril version */
             notifyRegistrantsRilConnectionChanged(-1);
