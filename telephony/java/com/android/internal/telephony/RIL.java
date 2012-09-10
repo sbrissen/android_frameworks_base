@@ -25,6 +25,7 @@ import static android.telephony.TelephonyManager.NETWORK_TYPE_HSDPA;
 import static android.telephony.TelephonyManager.NETWORK_TYPE_HSUPA;
 import static android.telephony.TelephonyManager.NETWORK_TYPE_HSPA;
 
+import android.app.ActivityManagerNative;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -65,8 +66,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import com.android.internal.telephony.BaseCommands;
 
 /**
  * {@hide}
@@ -207,7 +206,7 @@ class RILRequest {
 public class RIL extends BaseCommands implements CommandsInterface {
     static final String LOG_TAG = "RILJ";
     static final boolean RILJ_LOGD = true;
-    static final boolean RILJ_LOGV = false; // STOP SHIP if true
+    static final boolean RILJ_LOGV = true; // STOP SHIP if true
 
     /**
      * Wake lock timeout should be longer than the longest timeout in
@@ -367,7 +366,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                         dataLength[2] = (byte)((data.length >> 8) & 0xff);
                         dataLength[3] = (byte)((data.length) & 0xff);
 
-                        //Log.v(LOG_TAG, "writing packet: " + data.length + " bytes");
+                        Log.v(LOG_TAG, "writing packet: " + data.length + " bytes");
 
                         s.getOutputStream().write(dataLength);
                         s.getOutputStream().write(data);
@@ -519,7 +518,6 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
     class RILReceiver implements Runnable {
         byte[] buffer;
-		int mPhoneType;
 
         RILReceiver() {
             buffer = new byte[RIL_MAX_COMMAND_BYTES];
@@ -528,114 +526,21 @@ public class RIL extends BaseCommands implements CommandsInterface {
         public void
         run() {
             int retryCount = 0;
-									
-			Log.e (LOG_TAG,"mPhoneType: " + mPhoneType);
-			if(mPhoneType == 1) {
-			try {for (;;) {
-                LocalSocket s = null;
-                LocalSocketAddress l;
 
-                try {
-                    s = new LocalSocket();
-                    l = new LocalSocketAddress(SOCKET_NAME_RIL_EXT,
-                            LocalSocketAddress.Namespace.RESERVED);
-                    s.connect(l);
-                } catch (IOException ex){
-                    try {
-                        if (s != null) {
-                            s.close();
-                        }
-                    } catch (IOException ex2) {
-                        //ignore failure to close after failure to connect
-                    }
-
-                    // don't print an error message after the the first time
-                    // or after the 8th time
-
-                    if (retryCount == 8) {
-                        Log.e (LOG_TAG,
-                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
-                            + "' socket after " + retryCount
-                            + " times, continuing to retry silently");
-                    } else if (retryCount > 0 && retryCount < 8) {
-                        Log.i (LOG_TAG,
-                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
-                            + "' socket; retrying after timeout");
-                    }
-
-                    try {
-                        Thread.sleep(SOCKET_OPEN_RETRY_MILLIS);
-                    } catch (InterruptedException er) {
-                    }
-
-                    retryCount++;
-                    continue;
-                }
-
-                retryCount = 0;
-
-                mSocket = s;
-                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL_EXT + "' socket");
-
-                int length = 0;
-                try {
-                    InputStream is = mSocket.getInputStream();
-
-                    for (;;) {
-                        Parcel p;
-
-                        length = readRilMessage(is, buffer);
-
-                        if (length < 0) {
-							SystemProperties.set("ril.rildReset","1");
-                            // End-of-stream reached
-                            break;
-                        }
-
-                        p = Parcel.obtain();
-                        p.unmarshall(buffer, 0, length);
-                        p.setDataPosition(0);
-
-                        Log.v(LOG_TAG, "Read packet: " + length + " bytes");
-
-                        processResponse(p);
-                        p.recycle();
-                    }
-                } catch (java.io.IOException ex) {
-                    Log.i(LOG_TAG, "'" + SOCKET_NAME_RIL_EXT + "' socket closed",
-                          ex);
-                } catch (Throwable tr) {
-                    Log.e(LOG_TAG, "Uncaught exception read length=" + length +
-                        "Exception:" + tr.toString());
-                }
-
-                Log.i(LOG_TAG, "Disconnected from '" + SOCKET_NAME_RIL_EXT
-                      + "' socket");
-
-                setRadioState (RadioState.RADIO_UNAVAILABLE);
-
-                try {
-                    mSocket.close();
-                } catch (IOException ex) {
-                }
-
-                mSocket = null;
-                RILRequest.resetSerial();
-
-                // Clear request list on close
-                clearRequestsList(RADIO_NOT_AVAILABLE, false);
-            }} catch (Throwable tr) {
-                Log.e(LOG_TAG,"Uncaught exception", tr);
-            }
-			}else{
             try {for (;;) {
                 LocalSocket s = null;
                 LocalSocketAddress l;
-
+								
                 try {
                     s = new LocalSocket();
+					Log.d (LOG_TAG, "mPhoneType: " + mPhoneType);
+					if(mPhoneType == 1){
+					l = new LocalSocketAddress(SOCKET_NAME_RIL_EXT,
+                            LocalSocketAddress.Namespace.RESERVED);
+					}else{
                     l = new LocalSocketAddress(SOCKET_NAME_RIL,
                             LocalSocketAddress.Namespace.RESERVED);
+					}
                     s.connect(l);
                 } catch (IOException ex){
                     try {
@@ -648,8 +553,19 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
                     // don't print an error message after the the first time
                     // or after the 8th time
-
+				if(mPhoneType == 1){
                     if (retryCount == 8) {
+                        Log.e (LOG_TAG,
+                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
+                            + "' socket after " + retryCount
+                            + " times, continuing to retry silently");
+                    } else if (retryCount > 0 && retryCount < 8) {
+                        Log.i (LOG_TAG,
+                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
+                            + "' socket; retrying after timeout");
+                    }
+				}else{
+					if (retryCount == 8) {
                         Log.e (LOG_TAG,
                             "Couldn't find '" + SOCKET_NAME_RIL
                             + "' socket after " + retryCount
@@ -659,6 +575,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                             "Couldn't find '" + SOCKET_NAME_RIL
                             + "' socket; retrying after timeout");
                     }
+				}
 
                     try {
                         Thread.sleep(SOCKET_OPEN_RETRY_MILLIS);
@@ -672,7 +589,11 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 retryCount = 0;
 
                 mSocket = s;
-                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
+				if(mPhoneType == 1){
+                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL_EXT + "' socket");
+				}else{
+				Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
+				}
 
                 int length = 0;
                 try {
@@ -684,7 +605,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                         length = readRilMessage(is, buffer);
 
                         if (length < 0) {
-							SystemProperties.set("ril.rildReset","1");
+							SystemProperties.set("ril.RildReset","1");
                             // End-of-stream reached
                             break;
                         }
@@ -710,6 +631,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
                       + "' socket");
 
                 setRadioState (RadioState.RADIO_UNAVAILABLE);
+				Intent intent = new Intent("android.intent.action.RILD_CRASH");
+				intent.putExtra("PHONE_TYPE",mPhoneType);
+				ActivityManagerNative.broadcastStickyIntent(intent,null);
 
                 try {
                     mSocket.close();
@@ -724,7 +648,6 @@ public class RIL extends BaseCommands implements CommandsInterface {
             }} catch (Throwable tr) {
                 Log.e(LOG_TAG,"Uncaught exception", tr);
             }
-			}
 
             /* We're disconnected so we don't know the ril version */
             notifyRegistrantsRilConnectionChanged(-1);
