@@ -69,6 +69,7 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
 
     public SamsungChargeRIL(Context context, int networkMode, int cdmaSubscription) {
         super(context, networkMode, cdmaSubscription);
+		mQANElements = 4;
     }
 
     //SAMSUNG SGS STATES
@@ -83,27 +84,39 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
     static final int RIL_REQUEST_DIAL_EMERGENCY = 10016;
     static final int RIL_UNSOL_RADIO_REFRESH = 11025;
 
-    @Override
+	@Override
     public void
-    setRadioPower(boolean on, Message result) {
+    getIccCardStatus(Message result) {
+        //Note: This RIL request has not been renamed to ICC,
+        //       but this request is also valid for SIM and RUIM
+		
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_SIM_STATUS, result);
+		Log.i(LOG_TAG, "sbrissen charge - getIccCardStatus: " + result.toString() + "  " + requestToString(rr.mRequest));
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        //if (!on) {
-            RILRequest rrCs = RILRequest.obtain(
-                            RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE, null);
-            rrCs.mp.writeInt(1);
-            rrCs.mp.writeInt(mCdmaSubscription);
-            if (RILJ_LOGD) riljLog(rrCs.serialString() + "> "
-            + requestToString(rrCs.mRequest) + " : " + mCdmaSubscription);
-            send(rrCs);
-        //}
+		send(rr);
+    }
+	@Override
+    public void getVoiceRadioTechnology(Message result) {
+	//Charge RIL doesn't like this 
+		Log.i(LOG_TAG, "Ignoring GET_VOICE_RADIO_TECH request");
+      /*  RILRequest rr = RILRequest.obtain(RIL_REQUEST_VOICE_RADIO_TECH, result);
+		Log.i(LOG_TAG, "sbrissen - getVoiceRadioTechnology: " + result.toString() + "  " + requestToString(rr.mRequest));
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        RILRequest rr = RILRequest.obtain(RIL_REQUEST_RADIO_POWER, result);
-
-        rr.mp.writeInt(1);
-        rr.mp.writeInt(on ? 1 : 0);
+        send(rr);*/
+    }
+	
+    @Override
+    public void getCdmaSubscriptionSource(Message response) {
+	//Charge RIL doesn't like this 
+		Log.i(LOG_TAG, "Ignoring GET_SUBSCRIPTION_SOURCE request");
+     /*   RILRequest rr = RILRequest.obtain(
+                RILConstants.RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE, response);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
-        send(rr);
+
+        send(rr);*/
     }
 
     @Override
@@ -131,6 +144,7 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
         Object ret = null;
 
         if (error == 0 || p.dataAvail() > 0) {
+		
             // either command succeeds or command fails but with data payload
             try {switch (rr.mRequest) {
             /*
@@ -138,7 +152,7 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
             | egrep "^ *{RIL_" \
             | sed -re 's/\{([^,]+),[^,]+,([^}]+).+/case \1: ret = \2(p); break;/'
              */
-            case RIL_REQUEST_GET_SIM_STATUS: ret =  responseIccCardStatus(p); break;
+            case RIL_REQUEST_GET_SIM_STATUS: Log.i(LOG_TAG, "sbrissen - processsolicited responseIccCardStatus!"); ret =  responseIccCardStatus(p); break;
             case RIL_REQUEST_ENTER_SIM_PIN: ret =  responseInts(p); break;
             case RIL_REQUEST_ENTER_SIM_PUK: ret =  responseInts(p); break;
             case RIL_REQUEST_ENTER_SIM_PIN2: ret =  responseInts(p); break;
@@ -232,7 +246,7 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG: ret =  responseVoid(p); break;
             case RIL_REQUEST_CDMA_BROADCAST_ACTIVATION: ret =  responseVoid(p); break;
             case RIL_REQUEST_CDMA_VALIDATE_AND_WRITE_AKEY: ret =  responseVoid(p); break;
-            case RIL_REQUEST_CDMA_SUBSCRIPTION: ret =  responseStrings(p); break;
+            case RIL_REQUEST_CDMA_SUBSCRIPTION: ret =  responseCdmaSubscription(p); break;
             case RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM: ret =  responseInts(p); break;
             case RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM: ret =  responseVoid(p); break;
             case RIL_REQUEST_DEVICE_IDENTITY: ret =  responseStrings(p); break;
@@ -241,8 +255,8 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE: ret = responseVoid(p); break;
             case RIL_REQUEST_REPORT_SMS_MEMORY_STATUS: ret = responseVoid(p); break;
             case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING: ret = responseVoid(p); break;
-            case 104: ret = responseInts(p); break; // RIL_REQUEST_VOICE_RADIO_TECH
-			case 108: ret = responseInts(p); break;
+            case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE: Log.i(LOG_TAG, "sbrissen - processsolicited RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE"); ret = responseCdmaSubscriptionSource(p); break;
+			case RIL_REQUEST_VOICE_RADIO_TECH: Log.i(LOG_TAG, "sbrissen - processsolicited RIL_REQUEST_VOICE_RADIO_TECH"); ret = responseVoiceRadioTech(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
                 //break;
@@ -264,14 +278,16 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
 
         if (error != 0) {
             //ugly fix for Samsung messing up SMS_SEND request fail in binary RIL
-            if(!(error == -1 && rr.mRequest == RIL_REQUEST_SEND_SMS))
+            if(!(error == -1 && rr.mRequest == RIL_REQUEST_SEND_SMS) || !(error == -1 && rr.mRequest == RIL_REQUEST_GET_SIM_STATUS))
             {
+				Log.i(LOG_TAG, "sbrissen - processsolicited error");
                 rr.onError(error, ret);
                 rr.release();
                 return;
-            } else {
+            } else{
                 try
                 {
+					Log.i(LOG_TAG, "sbrissen - responseSMS fix");
                     ret =  responseSMS(p);
                 } catch (Throwable tr) {
                     Log.w(LOG_TAG, rr.serialString() + "< "
@@ -282,8 +298,8 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
                     return;
                 }
             }
-        }
-
+		}
+		
         if (RILJ_LOGD) riljLog(rr.serialString() + "< " + requestToString(rr.mRequest)
                 + " " + retToString(rr.mRequest, ret));
 
@@ -390,7 +406,9 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
         switch(response) {
         case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED:
                 int state = p.readInt();
+				Log.i(LOG_TAG, "sbrissen - RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED - state: " + state);
                 setRadioStateFromRILInt(state);
+				unsljLogMore(response, mState.toString());
                 break;
         case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED:
             if (RILJ_LOGD) unsljLog(response);
@@ -722,11 +740,44 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
         }
     }
 	
+    protected Object
+    responseCdmaSubscription(Parcel p) {
+        String response[] = (String[])responseStrings(p);
+            
+			if(response[4].startsWith("P:")){
+				Log.i(LOG_TAG, "responseCdmaSubscription - Begins With P");
+				String prlVersion = response[4].split(":")[1];
+				response          = new String[] {response[0], response[1], response[2],
+                                              response[3], prlVersion};
+			}
+        return response;
+    }
+
+//FIX ME!!!!!!!!!!!!	
+    protected Object
+    responseCdmaSubscriptionSource(Parcel p) {
+		/*private ContentResolver cr;
+		cr = 
+		int source = Secure.getInt(phone.getContext().getContentResolver(),
+                Secure.CDMA_SUBSCRIPTION_MODE);*/
+		int source = 0; //CDMA_SUBSCRIPTION_NV
+		return source;
+	}
+	
+	protected Object
+	responseVoiceRadioTech(Parcel p) {
+		int tech = 2;  //CDMA_PHONE
+		
+		return tech;
+	}		
+//END FIX ME !!!!!!!!!!!!
+
+	
     @Override
     protected Object
     responseIccCardStatus(Parcel p) {
         IccCardApplication ca;
-
+		Log.d(LOG_TAG, "sbrissen - responseIccCardStatus");
         IccCardStatus status = new IccCardStatus();
         status.setCardState(p.readInt());
         status.setUniversalPinState(p.readInt());
@@ -771,10 +822,12 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
         switch (stateCode) {
             case 0: //RADIO_OFF
                 radioState = CommandsInterface.RadioState.RADIO_OFF;
-                if (mIccHandler != null) {
+				
+              /* if (mIccHandler != null) {
                     mIccThread = null;
                     mIccHandler = null;
-                }
+                }*/
+				//setRadioState (radioState);
                 break;
             case 1: //RADIO_UNAVAILABLE
 			case 2: //SIM_NOT_READY
@@ -783,12 +836,13 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
 			case 7: //RUIM_LOCKED_OR_ABSENT
 			case 8: //NV_NOT_READY
                 radioState = CommandsInterface.RadioState.RADIO_UNAVAILABLE;
+				//setRadioState (radioState);
                 break;
             case 4: //SIM_READY
 			case 6: //RUIM_READY
 			case 9: //NV_READY
-                if (mIccHandler == null) {
-                    handlerThread = new HandlerThread("Handler");
+               /* if (mIccHandler == null) {
+                    handlerThread = new HandlerThread("IccHandler");
                     mIccThread = handlerThread;
 
                     mIccThread.start();
@@ -796,21 +850,23 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
                     looper = mIccThread.getLooper();
                     mIccHandler = new IccHandler(this,looper);
                     mIccHandler.run();
-                }
-                radioState = CommandsInterface.RadioState.RADIO_ON;
+                }*/
+					radioState = CommandsInterface.RadioState.RADIO_ON;		
+					//setRadioState (radioState);
                 break;
+
             default:
                 throw new RuntimeException("Unrecognized RIL_RadioState: " + stateCode);
         }
 
-        setRadioState (radioState);
+       setRadioState (radioState);
     }
 	
     class IccHandler extends Handler implements Runnable {
-        private static final int EVENT_RADIO_ON = 16;
-        private static final int EVENT_ICC_STATUS_CHANGED = 12;
-        private static final int EVENT_GET_ICC_STATUS_DONE = 2;
-        private static final int EVENT_RADIO_OFF_OR_UNAVAILABLE = 3;
+        private static final int EVENT_RADIO_ON = 1;
+        private static final int EVENT_ICC_STATUS_CHANGED = 2;
+        private static final int EVENT_GET_ICC_STATUS_DONE = 3;
+        private static final int EVENT_RADIO_OFF_OR_UNAVAILABLE = 4;
 
         private RIL mRil;
         private boolean mRadioOn = false;
@@ -1331,6 +1387,7 @@ public class SamsungChargeRIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_ISIM_AUTHENTICATION: return "RIL_REQUEST_ISIM_AUTHENTICATION";
             case RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU: return "RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU";
             case RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS: return "RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS";
+			case RIL_REQUEST_VOICE_RADIO_TECH: return "RIL_REQUEST_VOICE_RADIO_TECH";
             default: return "<unknown request>";
         }
     }
