@@ -217,6 +217,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
     //***** Instance Variables
 
     LocalSocket mSocket;
+	LocalSocket mSocket2;
     HandlerThread mSenderThread;
     RILSender mSender;
     Thread mReceiverThread;
@@ -531,22 +532,25 @@ public class RIL extends BaseCommands implements CommandsInterface {
         public void
         run() {
             int retryCount = 0;
-
+			
             try {for (;;) {
                 LocalSocket s = null;
                 LocalSocketAddress l;
-								
+					
                 try {
                     s = new LocalSocket();
 					Log.d (LOG_TAG, "mPhoneType: " + mPhoneType);
 					if(mPhoneType == 1){
+					Log.d (LOG_TAG, "Creating RILDEXT Socket");
 					l = new LocalSocketAddress(SOCKET_NAME_RIL_EXT,
                             LocalSocketAddress.Namespace.RESERVED);
 					}else{
+					Log.d (LOG_TAG, "Creating RILD Socket");
                     l = new LocalSocketAddress(SOCKET_NAME_RIL,
                             LocalSocketAddress.Namespace.RESERVED);
 					}
                     s.connect(l);
+					
                 } catch (IOException ex){
                     try {
                         if (s != null) {
@@ -599,21 +603,23 @@ public class RIL extends BaseCommands implements CommandsInterface {
 				}else{
 				Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
 				}
-
+				
                 int length = 0;
                 try {
                     InputStream is = mSocket.getInputStream();
-
+					
                     for (;;) {
                         Parcel p;
 
                         length = readRilMessage(is, buffer);
 
                         if (length < 0) {
-							SystemProperties.set("ril.RildReset","1");
+							SystemProperties.set("ril.rildReset","1");
+							Log.i(LOG_TAG, "END OF STREAM");
                             // End-of-stream reached
                             break;
                         }
+
 
                         p = Parcel.obtain();
                         p.unmarshall(buffer, 0, length);
@@ -650,10 +656,11 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
                 // Clear request list on close
                 clearRequestsList(RADIO_NOT_AVAILABLE, false);
+				
             }} catch (Throwable tr) {
                 Log.e(LOG_TAG,"Uncaught exception", tr);
             }
-
+			
             /* We're disconnected so we don't know the ril version */
             notifyRegistrantsRilConnectionChanged(-1);
         }
@@ -709,7 +716,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
     public void getVoiceRadioTechnology(Message result) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_VOICE_RADIO_TECH, result);
-
+		Log.i(LOG_TAG, "sbrissen - getVoiceRadioTechnology: " + result.toString() + "  " + requestToString(rr.mRequest));
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
         send(rr);
@@ -733,11 +740,12 @@ public class RIL extends BaseCommands implements CommandsInterface {
     getIccCardStatus(Message result) {
         //Note: This RIL request has not been renamed to ICC,
         //       but this request is also valid for SIM and RUIM
+		
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_SIM_STATUS, result);
-
+		Log.i(LOG_TAG, "sbrissen - getIccCardStatus: " + result.toString() + "  " + requestToString(rr.mRequest));
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
-        send(rr);
+		send(rr);
     }
 
     @Override public void
@@ -917,6 +925,8 @@ public class RIL extends BaseCommands implements CommandsInterface {
     public void
     getCurrentCalls (Message result) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_CURRENT_CALLS, result);
+		
+		Log.i(LOG_TAG, "sbrissen - GET_CURRENT_CALLS result: " + result.toString());
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
 
@@ -2301,7 +2311,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
  | egrep "^ *{RIL_" \
  | sed -re 's/\{([^,]+),[^,]+,([^}]+).+/case \1: ret = \2(p); break;/'
              */
-            case RIL_REQUEST_GET_SIM_STATUS: ret =  responseIccCardStatus(p); break;
+            case RIL_REQUEST_GET_SIM_STATUS: Log.i(LOG_TAG, "sbrissen RIL - getsimstatus");ret =  responseIccCardStatus(p); break;
             case RIL_REQUEST_ENTER_SIM_PIN: ret =  responseInts(p); break;
             case RIL_REQUEST_ENTER_SIM_PUK: ret =  responseInts(p); break;
             case RIL_REQUEST_ENTER_SIM_PIN2: ret =  responseInts(p); break;
@@ -3110,7 +3120,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
     protected Object
     responseIccCardStatus(Parcel p) {
         IccCardApplication ca;
-
+		
         boolean oldRil = needsOldRilFeature("icccardstatus");
 
         IccCardStatus status = new IccCardStatus();
