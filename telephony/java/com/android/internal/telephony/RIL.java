@@ -476,7 +476,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
      * @return Length of message less header, or -1 on end of stream.
      * @throws IOException
      */
-    private static int readRilMessage(InputStream is, byte[] buffer)
+    protected static int readRilMessage(InputStream is, byte[] buffer)
             throws IOException {
         int countRead;
         int offset;
@@ -522,7 +522,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
         return messageLength;
     }
 
-    class RILReceiver implements Runnable {
+    public class RILReceiver implements Runnable {
         byte[] buffer;
 
         RILReceiver() {
@@ -540,7 +540,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 try {
                     s = new LocalSocket();
 					Log.d (LOG_TAG, "mPhoneType: " + mPhoneType);
-					if(mPhoneType == 1){
+					if(mPhoneType != 1){
 					Log.d (LOG_TAG, "Creating RILDEXT Socket");
 					l = new LocalSocketAddress(SOCKET_NAME_RIL_EXT,
                             LocalSocketAddress.Namespace.RESERVED);
@@ -550,7 +550,6 @@ public class RIL extends BaseCommands implements CommandsInterface {
                             LocalSocketAddress.Namespace.RESERVED);
 					}
                     s.connect(l);
-					
                 } catch (IOException ex){
                     try {
                         if (s != null) {
@@ -562,7 +561,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
                     // don't print an error message after the the first time
                     // or after the 8th time
-				if(mPhoneType == 1){
+				if(mPhoneType != 1){
                     if (retryCount == 8) {
                         Log.e (LOG_TAG,
                             "Couldn't find '" + SOCKET_NAME_RIL_EXT
@@ -596,22 +595,28 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 }
 
                 retryCount = 0;
-
+				
+				try {
                 mSocket = s;
-				if(mPhoneType == 1){
+				
+				if(mPhoneType != 1){
                 Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL_EXT + "' socket");
 				}else{
 				Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
 				}
+				} catch (Throwable tr) {
+                    Log.e(LOG_TAG, "try socket connect");
+                }
 				
                 int length = 0;
                 try {
                     InputStream is = mSocket.getInputStream();
-					
+
                     for (;;) {
+						
                         Parcel p;
 
-                        length = readRilMessage(is, buffer);
+						length = readRilMessage(is, buffer);
 
                         if (length < 0) {
 							SystemProperties.set("ril.rildReset","1");
@@ -1966,6 +1971,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
      * {@inheritDoc}
      */
     public void setPreferredNetworkType(int networkType , Message response) {
+		Log.i(LOG_TAG, "sbrissen - setPreferredNetworkType");
         RILRequest rr = RILRequest.obtain(
                 RILConstants.RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE, response);
 
