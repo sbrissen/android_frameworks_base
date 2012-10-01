@@ -262,6 +262,8 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
     }
 
     private void getSubscriptionInfoAndStartPollingThreads() {
+	
+		log("sbrissen - getSubscriptionInfoAndStartPollingThreads()");
         cm.getCDMASubscription(obtainMessage(EVENT_POLL_STATE_CDMA_SUBSCRIPTION));
 
         // Get Registration Information
@@ -317,7 +319,8 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
 
         case EVENT_RADIO_STATE_CHANGED:
             if(cm.getRadioState() == RadioState.RADIO_ON) {
-                handleCdmaSubscriptionSource(mCdmaSSM.getCdmaSubscriptionSource());
+				log("sbrissen - event_radio_state_changed");
+						handleCdmaSubscriptionSource(mCdmaSSM.getCdmaSubscriptionSource());
 
                 // Signal strength polling stops when radio is off.
                 queueNextSignalStrengthPoll();
@@ -407,6 +410,7 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
                 if (cdmaSubscription != null && cdmaSubscription.length >= 5) {
                     mMdn = cdmaSubscription[0];
                     parseSidNid(cdmaSubscription[1], cdmaSubscription[2]);
+					log("sbrissen - " + cdmaSubscription[1] + " : " + cdmaSubscription[2] + " : " + cdmaSubscription[3] + " : " + cdmaSubscription[4]);
 
                     mMin = cdmaSubscription[3];
                     mPrlVersion = cdmaSubscription[4];

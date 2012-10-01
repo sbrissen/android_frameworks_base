@@ -552,7 +552,7 @@ public class SIMRecords extends IccRecords {
                     imsi = null;
                 }
 
-                log("IMSI: " + /* imsi.substring(0, 6) +*/ "xxxxxxx");
+                log("IMSI: " +  imsi.substring(0, 6) + "xxxxxxx");
 
                 if (((mncLength == UNKNOWN) || (mncLength == 2)) &&
                         ((imsi != null) && (imsi.length() >= 6))) {
@@ -692,7 +692,7 @@ public class SIMRecords extends IccRecords {
                 msisdn = adn.getNumber();
                 msisdnTag = adn.getAlphaTag();
 
-                log("MSISDN: " + /*msisdn*/ "xxxxxxx");
+                log("MSISDN: " + msisdn /*"xxxxxxx"*/);
             break;
 
             case EVENT_SET_MSISDN_DONE:

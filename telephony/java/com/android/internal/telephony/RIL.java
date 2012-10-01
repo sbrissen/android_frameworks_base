@@ -261,7 +261,6 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
     static final String SOCKET_NAME_RIL = "rild";
 	static final String SOCKET_NAME_RIL_EXT = "rildext";
-
     static final int SOCKET_OPEN_RETRY_MILLIS = 4 * 1000;
 
     // The number of the required config values for broadcast SMS stored in the C struct
@@ -561,7 +560,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
                     // don't print an error message after the the first time
                     // or after the 8th time
-				if(mPhoneType != 1){
+					if(mPhoneType == 1){
                     if (retryCount == 8) {
                         Log.e (LOG_TAG,
                             "Couldn't find '" + SOCKET_NAME_RIL_EXT
@@ -609,6 +608,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 }
 				
                 int length = 0;
+				
                 try {
                     InputStream is = mSocket.getInputStream();
 
@@ -3824,6 +3824,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
     public void
     getCDMASubscription(Message response) {
+		Log.i("RIL", "sbrissen - getCDMAsubscription()");
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_CDMA_SUBSCRIPTION, response);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
