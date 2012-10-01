@@ -48,7 +48,7 @@ public final class CdmaCallTracker extends CallTracker {
 
     private static final boolean REPEAT_POLLING = false;
 
-    private static final boolean DBG_POLL = false;
+    private static final boolean DBG_POLL = true;
 
     //***** Constants
 

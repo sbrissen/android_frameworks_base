@@ -21,6 +21,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.RILConstants;
 
+import com.android.internal.telephony.SamsungChargeRIL;
+
 import android.content.Context;
 import android.os.AsyncResult;
 import android.os.Handler;
@@ -29,6 +31,7 @@ import android.os.Registrant;
 import android.os.RegistrantList;
 import android.provider.Settings;
 import android.util.Log;
+import android.os.SystemProperties;
 
 /**
  * Class that handles the CDMA subscription source changed events from RIL
@@ -52,6 +55,8 @@ public class CdmaSubscriptionSourceManager extends Handler {
     private CommandsInterface mCM;
     private Context mContext;
     private RegistrantList mCdmaSubscriptionSourceChangedRegistrants = new RegistrantList();
+	
+	int mChargeSource = 0;
 
     // Type of CDMA subscription source
     private AtomicInteger mCdmaSubscriptionSource = new AtomicInteger(SUBSCRIPTION_FROM_NV);
@@ -109,13 +114,25 @@ public class CdmaSubscriptionSourceManager extends Handler {
             case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
             case EVENT_GET_CDMA_SUBSCRIPTION_SOURCE:
             {
+				if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){
+					log("sbrissen - CDMA_SUBSCRIPTION_SOURCE event");
+					mChargeSource = SamsungChargeRIL.getCDMASource();
+					handleChargeSource(mChargeSource);
+				}else{
                 log("CDMA_SUBSCRIPTION_SOURCE event = " + msg.what);
                 ar = (AsyncResult) msg.obj;
                 handleGetCdmaSubscriptionSource(ar);
+				}
             }
             break;
             case EVENT_RADIO_ON: {
+				log("CDMA_SUBSCRIPTION_SOURCE event = " + msg.what);
+				if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){
+					mChargeSource = SamsungChargeRIL.getCDMASource();
+					handleChargeSource(mChargeSource);
+				}else{
                 mCM.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
+				}
             }
             break;
             default:
@@ -128,7 +145,34 @@ public class CdmaSubscriptionSourceManager extends Handler {
      * @return CDMA subscription source value
      */
     public int getCdmaSubscriptionSource() {
-        return mCdmaSubscriptionSource.get();
+/*	int mChargeSource;
+	String mCharge = System.getProperty("ro.ril.radiostate");
+	if(mCharge == null){
+		mChargeSource = 4;
+	}else{
+		mChargeSource = Integer.parseInt(mCharge);
+	}
+	int source = 0;
+	log("sbrissen - CDMA Subscription: " + mChargeSource);
+
+	
+	   switch (mChargeSource) {
+        case 2: //RADIO_STATE_SIM_NOT_READY:
+        case 3: //RADIO_STATE_SIM_LOCKED_OR_ABSENT:
+        case 4: //RADIO_STATE_SIM_READY:
+        case 5: //RADIO_STATE_RUIM_NOT_READY:
+        case 6: //RADIO_STATE_RUIM_READY:
+        case 7: //RADIO_STATE_RUIM_LOCKED_OR_ABSENT:
+            source = SUBSCRIPTION_FROM_RUIM;
+
+        case 8: //RADIO_STATE_NV_NOT_READY:
+        case 9: //RADIO_STATE_NV_READY
+            source = SUBSCRIPTION_FROM_NV;
+		}
+		
+		return source;*/
+	
+       return mCdmaSubscriptionSource.get();
     }
 
     /**
@@ -159,8 +203,10 @@ public class CdmaSubscriptionSourceManager extends Handler {
      *            subscription source call
      */
     private void handleGetCdmaSubscriptionSource(AsyncResult ar) {
+		mCdmaSubscriptionSource.set(0);
         if ((ar.exception == null) && (ar.result != null)) {
             int newSubscriptionSource = ((int[]) ar.result)[0];
+			log("Sbrissen - Subscription Source: " + newSubscriptionSource);
 
             if (newSubscriptionSource != mCdmaSubscriptionSource.get()) {
                 log("Subscription Source Changed : " + mCdmaSubscriptionSource + " >> "
@@ -180,6 +226,20 @@ public class CdmaSubscriptionSourceManager extends Handler {
                     + ", result: " + ar.result);
         }
     }
+	
+	public void handleChargeSource(int newSubscriptionSource){		    
+			log("Sbrissen - Subscription Source: " + newSubscriptionSource);
+
+            if (newSubscriptionSource != mCdmaSubscriptionSource.get()) {
+                log("Subscription Source Changed : " + mCdmaSubscriptionSource + " >> "
+                        + newSubscriptionSource);
+                mCdmaSubscriptionSource.set(newSubscriptionSource);
+
+                // Notify registrants of the new CDMA subscription source
+                mCdmaSubscriptionSourceChangedRegistrants.notifyRegistrants(new AsyncResult(null,
+                        null, null));
+            }
+	}
 
     private void log(String s) {
         Log.d(LOG_TAG, "[CdmaSSM] " + s);

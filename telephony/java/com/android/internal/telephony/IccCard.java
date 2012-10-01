@@ -496,12 +496,12 @@ public class IccCard {
     }
 
     private void getIccCardStatusDone(AsyncResult ar) {
-        if (ar.exception != null) {
+        /*if (ar.exception != null) {
             Log.e(mLogTag,"Error getting ICC status. "
                     + "RIL_REQUEST_GET_ICC_STATUS should "
                     + "never return an error", ar.exception);
             return;
-        }
+        }*/
         handleIccCardStatus((IccCardStatus) ar.result);
     }
 
@@ -830,6 +830,7 @@ public class IccCard {
 
     public State getIccCardState() {
         if(!is3gpp && !isSubscriptionFromIccCard) {
+			Log.i(mLogTag, "sbrissen - getIccCardState();");
             // CDMA can get subscription from NV. In that case,
             // subscription is ready as soon as Radio is ON.
             return State.READY;

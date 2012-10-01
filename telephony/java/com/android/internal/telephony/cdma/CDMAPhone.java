@@ -83,7 +83,7 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OP
 public class CDMAPhone extends PhoneBase {
     static final String LOG_TAG = "CDMA";
     private static final boolean DBG = true;
-    private static final boolean VDBG = false; /* STOP SHIP if true */
+    private static final boolean VDBG = true; /* STOP SHIP if true */
 
     // Default Emergency Callback Mode exit timer
     private static final int DEFAULT_ECM_EXIT_TIMER_VALUE = 300000;
@@ -1170,7 +1170,8 @@ public class CDMAPhone extends PhoneBase {
      */
     @Override
     public boolean needsOtaServiceProvisioning() {
-        return mSST.getOtasp() != ServiceStateTracker.OTASP_NOT_NEEDED;
+        //return mSST.getOtasp() != ServiceStateTracker.OTASP_NOT_NEEDED;
+		return false;
     }
 
     private static final String IS683A_FEATURE_CODE = "*228";

@@ -258,6 +258,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
     static final int RESPONSE_UNSOLICITED = 1;
 
     static final String SOCKET_NAME_RIL = "rild";
+	    static final String SOCKET_NAME_RIL_EXT = "rildext";
 
     static final int SOCKET_OPEN_RETRY_MILLIS = 4 * 1000;
 
@@ -473,7 +474,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
      * @return Length of message less header, or -1 on end of stream.
      * @throws IOException
      */
-    private static int readRilMessage(InputStream is, byte[] buffer)
+    protected static int readRilMessage(InputStream is, byte[] buffer)
             throws IOException {
         int countRead;
         int offset;
@@ -536,8 +537,14 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
                 try {
                     s = new LocalSocket();
+					Log.i(LOG_TAG, "RIL - mPhonetype: " + mPhoneType);
+					if(mPhoneType == 1){
+                    l = new LocalSocketAddress(SOCKET_NAME_RIL_EXT,
+                            LocalSocketAddress.Namespace.RESERVED);
+					}else{
                     l = new LocalSocketAddress(SOCKET_NAME_RIL,
                             LocalSocketAddress.Namespace.RESERVED);
+					}
                     s.connect(l);
                 } catch (IOException ex){
                     try {
@@ -550,7 +557,18 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
                     // don't print an error message after the the first time
                     // or after the 8th time
-
+					if(mPhoneType == 1){
+                    if (retryCount == 8) {
+                        Log.e (LOG_TAG,
+                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
+                            + "' socket after " + retryCount
+                            + " times, continuing to retry silently");
+                    } else if (retryCount > 0 && retryCount < 8) {
+                        Log.i (LOG_TAG,
+                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
+                            + "' socket; retrying after timeout");
+                    }
+					}else{
                     if (retryCount == 8) {
                         Log.e (LOG_TAG,
                             "Couldn't find '" + SOCKET_NAME_RIL
@@ -561,6 +579,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                             "Couldn't find '" + SOCKET_NAME_RIL
                             + "' socket; retrying after timeout");
                     }
+					}
 
                     try {
                         Thread.sleep(SOCKET_OPEN_RETRY_MILLIS);
@@ -574,9 +593,14 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 retryCount = 0;
 
                 mSocket = s;
+				if(mPhoneType == 1){
+				Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL_EXT + "' socket");
+				}else{
                 Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
-
+				}
+				
                 int length = 0;
+				
                 try {
                     InputStream is = mSocket.getInputStream();
 
@@ -3780,6 +3804,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
     public void
     getCDMASubscription(Message response) {
+		Log.i("RIL", "sbrissen - getCDMAsubscription()");
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_CDMA_SUBSCRIPTION, response);
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));

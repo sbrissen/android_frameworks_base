@@ -39,6 +39,7 @@ import com.android.internal.telephony.test.SimulatedRadioControl;
 import com.android.internal.telephony.CallManager;
 
 import java.util.List;
+import java.lang.System;
 
 public class PhoneProxy extends Handler implements Phone {
     public final static Object lockForRadioTechnologyChange = new Object();
@@ -52,6 +53,8 @@ public class PhoneProxy extends Handler implements Phone {
     private boolean mResetModemOnRadioTechnologyChange = false;
 
     private int mRilVersion;
+	
+	int mChargeVoiceTech;
 
     private static final int EVENT_VOICE_RADIO_TECH_CHANGED = 1;
     private static final int EVENT_RADIO_ON = 2;
@@ -83,12 +86,20 @@ public class PhoneProxy extends Handler implements Phone {
         AsyncResult ar = (AsyncResult) msg.obj;
         switch(msg.what) {
         case EVENT_RADIO_ON:
+			
             /* Proactively query voice radio technologies */
+			if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){		
+				logd("sbrissen - [PHONEPROXY] EVENT_RADIO_ON");			
+				mChargeVoiceTech = SamsungChargeRIL.getCDMAVoiceRadioTechnology();
+				this.obtainMessage(EVENT_REQUEST_VOICE_RADIO_TECH_DONE);
+			}else{	
             mCommandsInterface.getVoiceRadioTechnology(
                     this.obtainMessage(EVENT_REQUEST_VOICE_RADIO_TECH_DONE));
+			}
             break;
 
         case EVENT_RIL_CONNECTED:
+			logd("sbrissen - [PHONEPROXY] EVENT_RIL_CONNECTED");
             if (ar.exception == null && ar.result != null) {
                 mRilVersion = (Integer) ar.result;
             } else {
@@ -99,7 +110,10 @@ public class PhoneProxy extends Handler implements Phone {
 
         case EVENT_VOICE_RADIO_TECH_CHANGED:
         case EVENT_REQUEST_VOICE_RADIO_TECH_DONE:
-
+			logd("sbrissen - [PHONEPROXY] EVENT_VOICE_RADIO_TECH_CHANGED");
+			if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){	
+				updatePhoneObject(mChargeVoiceTech);
+			}else{
             if (ar.exception == null) {
                 if ((ar.result != null) && (((int[]) ar.result).length != 0)) {
                     int newVoiceTech = ((int[]) ar.result)[0];
@@ -110,6 +124,7 @@ public class PhoneProxy extends Handler implements Phone {
             } else {
                 loge("Voice Radio Technology event " + msg.what + " exception!" + ar.exception);
             }
+			}
             break;
 
         default:
@@ -121,7 +136,7 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     private static void logd(String msg) {
-        Log.d(LOG_TAG, "[PhoneProxy] " + msg);
+        Log.i(LOG_TAG, "[PhoneProxy] " + msg);
     }
 
     private void logw(String msg) {
@@ -135,7 +150,7 @@ public class PhoneProxy extends Handler implements Phone {
     private void updatePhoneObject(int newVoiceRadioTech) {
 
         if (mActivePhone != null) {
-            if(mRilVersion == 6 && getLteOnCdmaMode() == Phone.LTE_ON_CDMA_TRUE) {
+            if(/*mRilVersion == 6 && */getLteOnCdmaMode() == Phone.LTE_ON_CDMA_TRUE) {
                 /*
                  * On v6 RIL, when LTE_ON_CDMA is TRUE, always create CDMALTEPhone
                  * irrespective of the voice radio tech reported.

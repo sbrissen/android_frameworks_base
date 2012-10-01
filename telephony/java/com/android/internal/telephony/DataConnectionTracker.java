@@ -63,7 +63,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class DataConnectionTracker extends Handler {
     protected static final boolean DBG = true;
-    protected static final boolean VDBG = false;
+    protected static final boolean VDBG = true;
 
     /**
      * IDLE: ready to start data connection setup, default state

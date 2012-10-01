@@ -221,7 +221,7 @@ public final class CdmaDataConnectionTracker extends DataConnectionTracker {
         boolean desiredPowerState = mCdmaPhone.mSST.getDesiredPowerState();
         boolean subscriptionFromNv = (mCdmaSSM.getCdmaSubscriptionSource()
                                        == CdmaSubscriptionSourceManager.SUBSCRIPTION_FROM_NV);
-
+		
         boolean allowed =
                     (psState == ServiceState.STATE_IN_SERVICE ||
                             mAutoAttachOnCreation) &&
