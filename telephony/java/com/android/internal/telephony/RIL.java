@@ -538,16 +538,10 @@ public class RIL extends BaseCommands implements CommandsInterface {
 					
                 try {
                     s = new LocalSocket();
-					Log.d (LOG_TAG, "mPhoneType: " + mPhoneType);
-					if(mPhoneType != 1){
-					Log.d (LOG_TAG, "Creating RILDEXT Socket");
-					l = new LocalSocketAddress(SOCKET_NAME_RIL_EXT,
+                    Log.d (LOG_TAG, "mPhoneType: " + mPhoneType);
+                        Log.d (LOG_TAG, "Creating RILDEXT Socket");
+                        l = new LocalSocketAddress(SOCKET_NAME_RIL,
                             LocalSocketAddress.Namespace.RESERVED);
-					}else{
-					Log.d (LOG_TAG, "Creating RILD Socket");
-                    l = new LocalSocketAddress(SOCKET_NAME_RIL,
-                            LocalSocketAddress.Namespace.RESERVED);
-					}
                     s.connect(l);
                 } catch (IOException ex){
                     try {
@@ -560,20 +554,8 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
                     // don't print an error message after the the first time
                     // or after the 8th time
-					if(mPhoneType == 1){
                     if (retryCount == 8) {
                         Log.e (LOG_TAG,
-                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
-                            + "' socket after " + retryCount
-                            + " times, continuing to retry silently");
-                    } else if (retryCount > 0 && retryCount < 8) {
-                        Log.i (LOG_TAG,
-                            "Couldn't find '" + SOCKET_NAME_RIL_EXT
-                            + "' socket; retrying after timeout");
-                    }
-				}else{
-					if (retryCount == 8) {
-                        Log.e (LOG_TAG,
                             "Couldn't find '" + SOCKET_NAME_RIL
                             + "' socket after " + retryCount
                             + " times, continuing to retry silently");
@@ -582,7 +564,6 @@ public class RIL extends BaseCommands implements CommandsInterface {
                             "Couldn't find '" + SOCKET_NAME_RIL
                             + "' socket; retrying after timeout");
                     }
-				}
 
                     try {
                         Thread.sleep(SOCKET_OPEN_RETRY_MILLIS);
@@ -594,18 +575,10 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 }
 
                 retryCount = 0;
-				
-				try {
+
                 mSocket = s;
-				
-				if(mPhoneType != 1){
-                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL_EXT + "' socket");
-				}else{
-				Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
-				}
-				} catch (Throwable tr) {
-                    Log.e(LOG_TAG, "try socket connect");
-                }
+
+                    Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
 				
                 int length = 0;
 				
@@ -616,11 +589,11 @@ public class RIL extends BaseCommands implements CommandsInterface {
 						
                         Parcel p;
 
-						length = readRilMessage(is, buffer);
+			length = readRilMessage(is, buffer);
 
                         if (length < 0) {
-							SystemProperties.set("ril.rildReset","1");
-							Log.i(LOG_TAG, "END OF STREAM");
+                            SystemProperties.set("ril.rildReset","1");
+                            Log.i(LOG_TAG, "END OF STREAM");
                             // End-of-stream reached
                             break;
                         }
@@ -647,9 +620,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
                       + "' socket");
 
                 setRadioState (RadioState.RADIO_UNAVAILABLE);
-				Intent intent = new Intent("android.intent.action.RILD_CRASH");
-				intent.putExtra("PHONE_TYPE",mPhoneType);
-				ActivityManagerNative.broadcastStickyIntent(intent,null);
+                Intent intent = new Intent("android.intent.action.RILD_CRASH");
+                intent.putExtra("PHONE_TYPE",mPhoneType);
+                ActivityManagerNative.broadcastStickyIntent(intent,null);
 
                 try {
                     mSocket.close();
