@@ -70,6 +70,7 @@ public abstract class BaseCommands implements CommandsInterface {
     protected RegistrantList mExitEmergencyCallbackModeRegistrants = new RegistrantList();
     protected RegistrantList mRilConnectedRegistrants = new RegistrantList();
     protected RegistrantList mIccRefreshRegistrants = new RegistrantList();
+    protected RegistrantList mNVReadyRegistrants = new RegistrantList();
 
     protected Registrant mGsmSmsRegistrant;
     protected Registrant mCdmaSmsRegistrant;
@@ -176,6 +177,25 @@ public abstract class BaseCommands implements CommandsInterface {
     public void unregisterForNotAvailable(Handler h) {
         synchronized (mStateMonitor) {
             mNotAvailRegistrants.remove(h);
+        }
+    }
+
+    /** Any transition into NV_READY */
+    public void registerForNVReady(Handler h, int what, Object obj) {
+        Registrant r = new Registrant (h, what, obj);
+
+        synchronized (mStateMonitor) {
+            mNVReadyRegistrants.add(r);
+
+            //if (mState.isNVReady()) {
+                r.notifyRegistrant(new AsyncResult(null, null, null));
+            //}
+        }
+    }
+
+    public void unregisterForNVReady(Handler h) {
+        synchronized (mStateMonitor) {
+            mNVReadyRegistrants.remove(h);
         }
     }
 

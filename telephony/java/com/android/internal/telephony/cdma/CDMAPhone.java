@@ -141,6 +141,7 @@ public class CDMAPhone extends PhoneBase {
     // Constructors
     public CDMAPhone(Context context, CommandsInterface ci, PhoneNotifier notifier) {
         super(notifier, context, ci, false);
+		//try {Thread.sleep(300);} catch (InterruptedException e) {}
         initSstIcc();
         init(context, notifier);
     }
@@ -148,6 +149,7 @@ public class CDMAPhone extends PhoneBase {
     public CDMAPhone(Context context, CommandsInterface ci, PhoneNotifier notifier,
             boolean unitTestMode) {
         super(notifier, context, ci, unitTestMode);
+		//try {Thread.sleep(300);} catch (InterruptedException e) {}
         initSstIcc();
         init(context, notifier);
     }
@@ -1469,6 +1471,7 @@ public class CDMAPhone extends PhoneBase {
     }
 
     private void registerForRuimRecordEvents() {
+		log("registerforRuimRecordeEvents");
         mIccRecords.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
         mIccRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
     }

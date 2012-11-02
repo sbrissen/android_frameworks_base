@@ -88,6 +88,7 @@ class RILRequest {
     Message mResult;
     Parcel mp;
     RILRequest mNext;
+    
 
     /**
      * Retrieves a new RILRequest instance from the pool.
@@ -262,7 +263,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
     static final int RESPONSE_UNSOLICITED = 1;
 
     static final String SOCKET_NAME_RIL = "rild";
-	static final String SOCKET_NAME_RIL_EXT = "rildext";
+    static final String SOCKET_NAME_RIL_EXT = "rildext";
+    public static int mChargePhoneType = 0;
+
     static final int SOCKET_OPEN_RETRY_MILLIS = 4 * 1000;
 
     // The number of the required config values for broadcast SMS stored in the C struct
@@ -270,6 +273,10 @@ public class RIL extends BaseCommands implements CommandsInterface {
     private static final int CDMA_BSI_NO_OF_INTS_STRUCT = 3;
 
     private static final int CDMA_BROADCAST_SMS_NO_OF_SERVICE_CATEGORIES = 31;
+
+    public static void setChargePhone(int type){
+      mChargePhoneType = type;
+    }
 
     BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
@@ -540,10 +547,14 @@ public class RIL extends BaseCommands implements CommandsInterface {
 					
                 try {
                     s = new LocalSocket();
-                    Log.d (LOG_TAG, "mPhoneType: " + mPhoneType);
-                        Log.d (LOG_TAG, "Creating RILDEXT Socket");
-                        l = new LocalSocketAddress(SOCKET_NAME_RIL,
-                            LocalSocketAddress.Namespace.RESERVED);
+         		Log.i(LOG_TAG, "mChargePhoneType: " + mChargePhoneType);
+		    if(mChargePhoneType == 2){
+                    l = new LocalSocketAddress(SOCKET_NAME_RIL_EXT,
+                            LocalSocketAddress.Namespace.RESERVED);	
+		    }else{
+                    l = new LocalSocketAddress(SOCKET_NAME_RIL,
+                    LocalSocketAddress.Namespace.RESERVED);
+		    }
                     s.connect(l);
                 } catch (IOException ex){
                     try {
@@ -580,8 +591,12 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
                 mSocket = s;
 
-                    Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
-				
+		    if(mChargePhoneType == 2){
+                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL_EXT + "' socket");
+		    }else{
+                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
+		    }
+
                 int length = 0;
 				
                 try {
@@ -660,7 +675,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
         mPreferredNetworkType = preferredNetworkType;
         mSetPreferredNetworkType = preferredNetworkType;
         mPhoneType = RILConstants.NO_PHONE;
-
+			
         PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
         mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, LOG_TAG);
         mWakeLock.setReferenceCounted(false);
@@ -693,8 +708,8 @@ public class RIL extends BaseCommands implements CommandsInterface {
     }
 
     //***** CommandsInterface implementation
-
-    public void getVoiceRadioTechnology(Message result) {
+    @Override public void 
+    getVoiceRadioTechnology(Message result) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_VOICE_RADIO_TECH, result);
 		Log.i(LOG_TAG, "sbrissen - getVoiceRadioTechnology: " + result.toString() + "  " + requestToString(rr.mRequest));
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));

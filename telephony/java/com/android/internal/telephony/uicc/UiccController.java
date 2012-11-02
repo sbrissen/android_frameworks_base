@@ -78,13 +78,15 @@ public class UiccController {
         }
 
         if (mIccCard != null) {
-            mIccCard.dispose();
-            mIccCard = null;
+           //mIccCard.dispose();
+          // mIccCard = null;
+	   // return;
         }
 
         mIsCurrentCard3gpp = isNewCard3gpp;
         mIccCard = new IccCard(mCurrentPhone, mCurrentPhone.getPhoneName(),
                 isNewCard3gpp, DBG);
+		log("sbrissen - updateCurrentCard: " + mCurrentPhone.getPhoneName());
     }
 
     private void log(String string) {

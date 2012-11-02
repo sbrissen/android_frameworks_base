@@ -1485,6 +1485,7 @@ public class GSMPhone extends PhoneBase {
     }
 
     private void registerForSimRecordEvents() {
+		Log.i(LOG_TAG, "registerForSimRecordEvents");
         mIccRecords.registerForNetworkSelectionModeAutomatic(
                 this, EVENT_SET_NETWORK_AUTOMATIC, null);
         mIccRecords.registerForNewSms(this, EVENT_NEW_ICC_SMS, null);

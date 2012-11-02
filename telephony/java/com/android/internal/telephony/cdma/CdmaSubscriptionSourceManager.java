@@ -33,6 +33,9 @@ import android.provider.Settings;
 import android.util.Log;
 import android.os.SystemProperties;
 
+import android.os.SystemProperties;
+import com.android.internal.telephony.SamsungChargeRIL;
+
 /**
  * Class that handles the CDMA subscription source changed events from RIL
  */
@@ -50,6 +53,8 @@ public class CdmaSubscriptionSourceManager extends Handler {
     private static CdmaSubscriptionSourceManager sInstance;
     private static final Object sReferenceCountMonitor = new Object();
     private static int sReferenceCount = 0;
+	
+	int mChargeSource = 0;
 
     // ***** Instance Variables
     private CommandsInterface mCM;
@@ -117,7 +122,7 @@ public class CdmaSubscriptionSourceManager extends Handler {
 				if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){
 					log("sbrissen - CDMA_SUBSCRIPTION_SOURCE event");
 					mChargeSource = SamsungChargeRIL.getCDMASource();
-					handleChargeSource(mChargeSource);
+					handleChargeSource(mChargeSource);					
 				}else{
                 log("CDMA_SUBSCRIPTION_SOURCE event = " + msg.what);
                 ar = (AsyncResult) msg.obj;
@@ -125,15 +130,15 @@ public class CdmaSubscriptionSourceManager extends Handler {
 				}
             }
             break;
-            case EVENT_RADIO_ON: {
+            case EVENT_RADIO_ON:
 				log("CDMA_SUBSCRIPTION_SOURCE event = " + msg.what);
 				if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){
 					mChargeSource = SamsungChargeRIL.getCDMASource();
 					handleChargeSource(mChargeSource);
+					obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE);
 				}else{
                 mCM.getCdmaSubscriptionSource(obtainMessage(EVENT_GET_CDMA_SUBSCRIPTION_SOURCE));
 				}
-            }
             break;
             default:
                 super.handleMessage(msg);
@@ -207,7 +212,6 @@ public class CdmaSubscriptionSourceManager extends Handler {
         if ((ar.exception == null) && (ar.result != null)) {
             int newSubscriptionSource = ((int[]) ar.result)[0];
 			log("Sbrissen - Subscription Source: " + newSubscriptionSource);
-
             if (newSubscriptionSource != mCdmaSubscriptionSource.get()) {
                 log("Subscription Source Changed : " + mCdmaSubscriptionSource + " >> "
                         + newSubscriptionSource);

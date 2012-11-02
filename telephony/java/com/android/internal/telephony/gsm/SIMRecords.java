@@ -280,7 +280,7 @@ public class SIMRecords extends IccRecords {
         msisdn = number;
         msisdnTag = alphaTag;
 
-        if(DBG) log("Set MSISDN: " + msisdnTag + " " + /*msisdn*/ "xxxxxxx");
+        if(DBG) log("Set MSISDN: " + msisdnTag + " " + msisdn + "xxxxxxx");
 
 
         AdnRecord adn = new AdnRecord(msisdnTag, msisdn);
@@ -552,7 +552,7 @@ public class SIMRecords extends IccRecords {
                     imsi = null;
                 }
 
-                log("IMSI: " +  imsi.substring(0, 6) + "xxxxxxx");
+                log("IMSI: " + imsi.substring(0, 6) + "xxxxxxx");
 
                 if (((mncLength == UNKNOWN) || (mncLength == 2)) &&
                         ((imsi != null) && (imsi.length() >= 6))) {
@@ -692,7 +692,8 @@ public class SIMRecords extends IccRecords {
                 msisdn = adn.getNumber();
                 msisdnTag = adn.getAlphaTag();
 
-                log("MSISDN: " + msisdn /*"xxxxxxx"*/);
+                log("MSISDN: " + msisdn + "xxxxxxx");
+
             break;
 
             case EVENT_SET_MSISDN_DONE:
@@ -1261,6 +1262,7 @@ public class SIMRecords extends IccRecords {
 
         log("SIMRecords: onAllRecordsLoaded set 'gsm.sim.operator.numeric' to operator='" +
                 operator + "'");
+	//operator = "310012";
         SystemProperties.set(PROPERTY_ICC_OPERATOR_NUMERIC, operator);
 
         if (imsi != null) {

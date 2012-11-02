@@ -32,6 +32,9 @@ import com.android.internal.telephony.sip.SipPhoneFactory;
 
 import java.lang.reflect.Constructor;
 
+import com.android.internal.telephony.SamsungChargeRIL;
+import com.android.internal.telephony.MultiModePhoneProxy;
+
 /**
  * {@hide}
  */
@@ -43,12 +46,15 @@ public class PhoneFactory {
     //***** Class Variables
 
     static private Phone sProxyPhone = null;
-    static private CommandsInterface sCommandsInterface = null;
+    static private Phone sProxyPhoneGSM = null;
+    static private Phone mMultiProxyPhone = null;
+    static private CommandsInterface[] sCommandsInterface = new CommandsInterface[2];
 
     static private boolean sMadeDefaults = false;
     static private PhoneNotifier sPhoneNotifier;
     static private Looper sLooper;
     static private Context sContext;
+    static public int mChargePhoneType = 0;
 
     static final int preferredCdmaSubscription =
                          CdmaSubscriptionSourceManager.PREFERRED_CDMA_SUBSCRIPTION;
@@ -147,8 +153,12 @@ public class PhoneFactory {
                 try {
                     Class<?> classDefinition = Class.forName("com.android.internal.telephony." + sRILClassname);
                     Constructor<?> constructor = classDefinition.getConstructor(new Class[] {Context.class, int.class, int.class});
-                    sCommandsInterface = (RIL) constructor.newInstance(new Object[] {context, networkMode, cdmaSubscription});
-                } catch (Exception e) {
+		    RIL.setChargePhone(2);
+                    sCommandsInterface[0] = (RIL) constructor.newInstance(new Object[] {sContext, networkMode, cdmaSubscription});	
+		    try {Thread.sleep(50);} catch (InterruptedException e) {}
+		    RIL.setChargePhone(1);
+		    sCommandsInterface[1] = (RIL) constructor.newInstance(new Object[] {sContext, networkMode, cdmaSubscription});
+		} catch (Exception e) {
                     // 6 different types of exceptions are thrown here that it's
                     // easier to just catch Exception as our "error handling" is the same.
                     Log.wtf(LOG_TAG, "Unable to construct command interface", e);
@@ -156,25 +166,33 @@ public class PhoneFactory {
                 }
 
                 int phoneType = getPhoneType(networkMode);
-                if (phoneType == Phone.PHONE_TYPE_GSM) {
-                    Log.i(LOG_TAG, "Creating GSMPhone");
+		Log.i(LOG_TAG, "sbrissen - phoneType: " + phoneType);
+
+		Log.i(LOG_TAG, "3 Creating CDMAPhone");
+		sProxyPhone = new CDMAPhone(context, sCommandsInterface[1], sPhoneNotifier);
+		Log.i(LOG_TAG, "3 Creating GSMPhone");
+		sProxyPhoneGSM = new GSMPhone(context, sCommandsInterface[0], sPhoneNotifier);	
+			
+		mMultiProxyPhone = new MultiModePhoneProxy(sProxyPhone, sProxyPhoneGSM, sContext);
+                /*if (phoneType == Phone.PHONE_TYPE_GSM) {
+                    Log.i(LOG_TAG, "1 Creating GSMPhone");
                     sProxyPhone = new PhoneProxy(new GSMPhone(context,
-                            sCommandsInterface, sPhoneNotifier));
-                } else if (phoneType == Phone.PHONE_TYPE_CDMA) {
-                    switch (BaseCommands.getLteOnCdmaModeStatic()) {
+                            sCommandsInterface[0], sPhoneNotifier));
+			   // Log.i(LOG_TAG, "1 Creating CDMAPhone");
+			   // sProxyPhoneGSM = new PhoneProxy(new CDMAPhone(context, sCommandsInterface, sPhoneNotifier),0);
+                } else if (phoneType == Phone.PHONE_TYPE_CDMA) {*/
+                 /*   switch (BaseCommands.getLteOnCdmaModeStatic()) {
                         case Phone.LTE_ON_CDMA_TRUE:
-                            Log.i(LOG_TAG, "Creating CDMALTEPhone");
-                            sProxyPhone = new PhoneProxy(new CDMALTEPhone(context,
-                                sCommandsInterface, sPhoneNotifier));
-                            break;
+                            Log.i(LOG_TAG, "2 Creating CDMALTEPhone");
+                            sProxyPhone = new PhoneProxy(new CDMALTEPhone(sContext, sCommandsInterface[1], sPhoneNotifier));
+			       break;
                         case Phone.LTE_ON_CDMA_FALSE:
                         default:
-                            Log.i(LOG_TAG, "Creating CDMAPhone");
-                            sProxyPhone = new PhoneProxy(new CDMAPhone(context,
-                                    sCommandsInterface, sPhoneNotifier));
+                            Log.i(LOG_TAG, "3 Creating CDMAPhone");
+                            sProxyPhone = new PhoneProxy(new CDMAPhone(context, sCommandsInterface[1], sPhoneNotifier));
                             break;
-                    }
-                }
+                    }*/
+                //}
 
                 sMadeDefaults = true;
             }
@@ -189,6 +207,7 @@ public class PhoneFactory {
      * @return Phone Type
      */
     public static int getPhoneType(int networkMode) {
+		Log.i(LOG_TAG, "getPhoneType");
         switch(networkMode) {
         case RILConstants.NETWORK_MODE_CDMA:
         case RILConstants.NETWORK_MODE_CDMA_NO_EVDO:
@@ -228,32 +247,43 @@ public class PhoneFactory {
         if (!sMadeDefaults) {
             throw new IllegalStateException("Default phones haven't been made yet!");
         }
-       return sProxyPhone;
+       return mMultiProxyPhone;
+      //return sProxyPhone;
     }
 
     public static Phone getCdmaPhone() {
-        Phone phone;
+	Log.i(LOG_TAG, "getCdmaPhone");
+	
+       // Phone phone;
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
+	  if(sProxyPhone == null){
             switch (BaseCommands.getLteOnCdmaModeStatic()) {
                 case Phone.LTE_ON_CDMA_TRUE: {
-                    phone = new CDMALTEPhone(sContext, sCommandsInterface, sPhoneNotifier);
+                    sProxyPhone = new CDMALTEPhone(sContext, sCommandsInterface[1], sPhoneNotifier);
                     break;
                 }
                 case Phone.LTE_ON_CDMA_FALSE:
                 case Phone.LTE_ON_CDMA_UNKNOWN:
                 default: {
-                    phone = new CDMAPhone(sContext, sCommandsInterface, sPhoneNotifier);
+                    sProxyPhone = new CDMAPhone(sContext, sCommandsInterface[1], sPhoneNotifier);
                     break;
                 }
             }
-        }
-        return phone;
+	  }
+	}
+
+	return sProxyPhone;
+	
     }
 
     public static Phone getGsmPhone() {
+	Log.i(LOG_TAG, "getGsmPhone");
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
-            Phone phone = new GSMPhone(sContext, sCommandsInterface, sPhoneNotifier);
-            return phone;
+	  if(sProxyPhoneGSM == null){
+            sProxyPhoneGSM = new GSMPhone(sContext, sCommandsInterface[0], sPhoneNotifier);
+	  }
+
+            return sProxyPhone;
         }
     }
 

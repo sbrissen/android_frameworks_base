@@ -167,6 +167,8 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
     public CdmaServiceStateTracker(CDMAPhone phone) {
         super();
 
+	log("sbrissen - cdmaServiceStateTracker");
+
         this.phone = phone;
         cr = phone.getContext().getContentResolver();
         cm = phone.mCM;
@@ -288,8 +290,9 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
             break;
 
         case EVENT_RUIM_READY:
+	    log("sbrissen - EVENT_RUIM_READY");
             // TODO: Consider calling setCurrentPreferredNetworkType as we do in GsmSST.
-            // cm.setCurrentPreferredNetworkType();
+            cm.setCurrentPreferredNetworkType();
 
             // The RUIM is now ready i.e if it was locked it has been
             // unlocked. At this stage, the radio is already powered on.
@@ -314,10 +317,12 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
             // For Non-RUIM phones, the subscription information is stored in
             // Non Volatile. Here when Non-Volatile is ready, we can poll the CDMA
             // subscription info.
+	    log("sbrissen - EVENT_NV_READY");
             getSubscriptionInfoAndStartPollingThreads();
             break;
 
         case EVENT_RADIO_STATE_CHANGED:
+	    log("sbrissen - EVENT_RADIO_STATE_CHANGED");
             if(cm.getRadioState() == RadioState.RADIO_ON) {
 				log("sbrissen - event_radio_state_changed");
 						handleCdmaSubscriptionSource(mCdmaSSM.getCdmaSubscriptionSource());
@@ -350,7 +355,7 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
 
         case EVENT_GET_LOC_DONE_CDMA:
             ar = (AsyncResult) msg.obj;
-
+	    log("sbrissen - EVENT_GET_LOC_DONE_CDMA");
             if (ar.exception == null) {
                 String states[] = (String[])ar.result;
                 int baseStationId = -1;
@@ -398,11 +403,13 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
 
         case EVENT_POLL_STATE_REGISTRATION_CDMA:
         case EVENT_POLL_STATE_OPERATOR_CDMA:
+	    log("sbrissen - EVENT_POLL_STATE_OPERATOR_CDMA");
             ar = (AsyncResult) msg.obj;
             handlePollStateResult(msg.what, ar);
             break;
 
         case EVENT_POLL_STATE_CDMA_SUBSCRIPTION: // Handle RIL_CDMA_SUBSCRIPTION
+	    log("sbrissen - EVENT_POLL_STATE_CDMA_SUBSCRIPTION");
             ar = (AsyncResult) msg.obj;
 
             if (ar.exception == null) {
@@ -476,6 +483,7 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
             break;
 
         case EVENT_OTA_PROVISION_STATUS_CHANGE:
+	    log("sbrissen - EVENT_OTA_PROVISION_STATUS_CHANGE");
             ar = (AsyncResult)msg.obj;
             if (ar.exception == null) {
                 ints = (int[]) ar.result;
@@ -489,6 +497,7 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
             break;
 
         case EVENT_CDMA_PRL_VERSION_CHANGED:
+	    log("sbrissen - EVENT_CDMA_PRL_VERSION_CHANGED");
             ar = (AsyncResult)msg.obj;
             if (ar.exception == null) {
                 ints = (int[]) ar.result;
