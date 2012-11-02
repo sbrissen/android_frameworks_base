@@ -59,11 +59,15 @@ public class IccCard {
     private final Object mStateMonitor = new Object();
 
     protected boolean is3gpp = true;
+    protected static boolean mIs3gpp = true;
     protected boolean isSubscriptionFromIccCard = true;
     protected CdmaSubscriptionSourceManager mCdmaSSM = null;
     protected PhoneBase mPhone;
     private IccRecords mIccRecords;
     private IccFileHandler mIccFileHandler;
+
+    protected PhoneBase mLtePhone;
+    protected PhoneBase mCdmaPhone;
 
     private RegistrantList mAbsentRegistrants = new RegistrantList();
     private RegistrantList mPinLockedRegistrants = new RegistrantList();
@@ -152,7 +156,11 @@ public class IccCard {
     }
 
     public State getState() {
+//if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){	
+   // return State.READY;
+//}else{
         if (mState == null) {
+	
             switch(mPhone.mCM.getRadioState()) {
                 /* This switch block must not return anything in
                  * State.isLocked() or State.ABSENT.
@@ -163,6 +171,7 @@ public class IccCard {
                     return State.UNKNOWN;
                 default:
                     if (!is3gpp && !isSubscriptionFromIccCard) {
+			log("sbrissen - !3gpp && !isSubscriptionFromIccCard");
                         // CDMA can get subscription from NV. In that case,
                         // subscription is ready as soon as Radio is ON.
                         return State.READY;
@@ -173,6 +182,7 @@ public class IccCard {
         }
 
         return State.UNKNOWN;
+//}
     }
 
     public IccCard(PhoneBase phone, String logTag, Boolean is3gpp, Boolean dbg) {
@@ -180,14 +190,18 @@ public class IccCard {
         mDbg = dbg;
         if (mDbg) log("[IccCard] Creating card type " + (is3gpp ? "3gpp" : "3gpp2"));
         mPhone = phone;
+	//mLtePhone = phone;
         this.is3gpp = is3gpp;
+	mIs3gpp = is3gpp;
         mCdmaSSM = CdmaSubscriptionSourceManager.getInstance(mPhone.getContext(),
                 mPhone.mCM, mHandler, EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED, null);
         if (phone.mCM.getLteOnCdmaMode() == Phone.LTE_ON_CDMA_TRUE
                 && phone instanceof CDMALTEPhone) {
             mIccFileHandler = new CdmaLteUiccFileHandler(this, "", mPhone.mCM);
             mIccRecords = new CdmaLteUiccRecords(this, mPhone.mContext, mPhone.mCM);
+	    log("sbrissen - CdmaLteUiccFileHandler");
         } else {
+	    log("sbrissen - SIMFileHandler");
             // Correct aid will be set later (when GET_SIM_STATUS returns)
             mIccFileHandler = is3gpp ? new SIMFileHandler(this, "", mPhone.mCM) :
                                        new RuimFileHandler(this, "", mPhone.mCM);
@@ -197,6 +211,8 @@ public class IccCard {
         mPhone.mCM.registerForOffOrNotAvailable(mHandler, EVENT_RADIO_OFF_OR_NOT_AVAILABLE, null);
         mPhone.mCM.registerForOn(mHandler, EVENT_RADIO_ON, null);
         mPhone.mCM.registerForIccStatusChanged(mHandler, EVENT_ICC_STATUS_CHANGED, null);
+		
+		log("sbrissen - IccPhoneType: " + mPhone.getPhoneName());
     }
 
     public void dispose() {
@@ -291,11 +307,16 @@ public class IccCard {
     }
 
     public State getRuimState() {
+      log("sbrissen - getruimState");
+      //if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){
+          //  return SamsungChargeRIL.getSimStatus();
+      //}else{
         if(mIccCardStatus != null) {
             return getAppState(mIccCardStatus.getCdmaSubscriptionAppIndex());
         } else {
             return State.UNKNOWN;
         }
+     // }
     }
 
     public void registerForRuimReady(Handler h, int what, Object obj) {
@@ -338,26 +359,31 @@ public class IccCard {
      */
 
     public void supplyPin (String pin, Message onComplete) {
-        mPhone.mCM.supplyIccPin(pin, mHandler.obtainMessage(EVENT_PINPUK_DONE, onComplete));
+		log("sbrissen - supplyPin");////////////////////////////////
+        mLtePhone.mCM.supplyIccPin(pin, mHandler.obtainMessage(EVENT_PINPUK_DONE, onComplete));
     }
 
     public void supplyPuk (String puk, String newPin, Message onComplete) {
-        mPhone.mCM.supplyIccPuk(puk, newPin,
+	log("sbrissen - supplyPuk");
+        mLtePhone.mCM.supplyIccPuk(puk, newPin,
                 mHandler.obtainMessage(EVENT_PINPUK_DONE, onComplete));
     }
 
     public void supplyPin2 (String pin2, Message onComplete) {
-        mPhone.mCM.supplyIccPin2(pin2,
+		log("sbrissen - supplyPin2");
+        mLtePhone.mCM.supplyIccPin2(pin2,
                 mHandler.obtainMessage(EVENT_PINPUK_DONE, onComplete));
     }
 
     public void supplyPuk2 (String puk2, String newPin2, Message onComplete) {
-        mPhone.mCM.supplyIccPuk2(puk2, newPin2,
+	log("sbrissen - supplyPuk2");
+        mLtePhone.mCM.supplyIccPuk2(puk2, newPin2,
                 mHandler.obtainMessage(EVENT_PINPUK_DONE, onComplete));
     }
 
     public void supplyNetworkDepersonalization (String pin, Message onComplete) {
-        mPhone.mCM.supplyNetworkDepersonalization(pin,
+        log("sbrissen - supplyNetworkDepersonalization");
+		mLtePhone.mCM.supplyNetworkDepersonalization(pin,
                 mHandler.obtainMessage(EVENT_PINPUK_DONE, onComplete));
     }
 
@@ -403,7 +429,7 @@ public class IccCard {
 
          mDesiredPinLocked = enabled;
 
-         mPhone.mCM.setFacilityLock(CommandsInterface.CB_FACILITY_BA_SIM,
+         mLtePhone.mCM.setFacilityLock(CommandsInterface.CB_FACILITY_BA_SIM,
                  enabled, password, serviceClassX,
                  mHandler.obtainMessage(EVENT_CHANGE_FACILITY_LOCK_DONE, onComplete));
      }
@@ -429,7 +455,7 @@ public class IccCard {
 
          mDesiredFdnEnabled = enabled;
 
-         mPhone.mCM.setFacilityLock(CommandsInterface.CB_FACILITY_BA_FD,
+         mLtePhone.mCM.setFacilityLock(CommandsInterface.CB_FACILITY_BA_FD,
                  enabled, password, serviceClassX,
                  mHandler.obtainMessage(EVENT_CHANGE_FACILITY_FDN_DONE, onComplete));
      }
@@ -447,7 +473,8 @@ public class IccCard {
       */
      public void changeIccLockPassword(String oldPassword, String newPassword,
              Message onComplete) {
-         mPhone.mCM.changeIccPin(oldPassword, newPassword,
+			 log("sbrissen-changeIccLockPassword");
+         mLtePhone.mCM.changeIccPin(oldPassword, newPassword,
                  mHandler.obtainMessage(EVENT_CHANGE_ICC_PASSWORD_DONE, onComplete));
 
      }
@@ -465,7 +492,8 @@ public class IccCard {
       */
      public void changeIccFdnPassword(String oldPassword, String newPassword,
              Message onComplete) {
-         mPhone.mCM.changeIccPin2(oldPassword, newPassword,
+			log("sbrissen-changeIccFdnPassword");
+         mLtePhone.mCM.changeIccPin2(oldPassword, newPassword,
                  mHandler.obtainMessage(EVENT_CHANGE_ICC_PASSWORD_DONE, onComplete));
 
      }
@@ -488,11 +516,14 @@ public class IccCard {
      *
      */
     public String getServiceProviderName () {
-        return mPhone.mIccRecords.getServiceProviderName();
+        return mLtePhone.mIccRecords.getServiceProviderName();
     }
 
     protected void updateStateProperty() {
+	Log.i(mLogTag, "updateStateProperty()");
         mPhone.setSystemProperty(TelephonyProperties.PROPERTY_SIM_STATE, getState().toString());
+	mLtePhone.setSystemProperty(TelephonyProperties.PROPERTY_SIM_STATE, getState().toString());
+	setOperatorForMarket();
     }
 
     private void getIccCardStatusDone(AsyncResult ar) {
@@ -524,12 +555,15 @@ public class IccCard {
             mState = newState;
             updateStateProperty();
             if (oldState != State.READY && newState == State.READY) {
+		Log.i(mLogTag, "ICC READY!");
                 mHandler.sendMessage(mHandler.obtainMessage(EVENT_ICC_READY));
                 mReadyRegistrants.notifyRegistrants();
             } else if (newState.isPinLocked()) {
+		Log.i(mLogTag, "PIN LOCKED!");
                 mHandler.sendMessage(mHandler.obtainMessage(EVENT_ICC_LOCKED));
             }
             if (oldRuimState != State.READY && getRuimState() == State.READY) {
+		Log.i(mLogTag, "RUIM READY!");
                 mRuimReadyRegistrants.notifyRegistrants();
             }
         }
@@ -669,6 +703,7 @@ public class IccCard {
         Intent intent = new Intent(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
         intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
         intent.putExtra(Phone.PHONE_NAME_KEY, mPhone.getPhoneName());
+	intent.putExtra(Phone.PHONE_NAME_KEY, mLtePhone.getPhoneName());
         intent.putExtra(INTENT_KEY_ICC_STATE, value);
         intent.putExtra(INTENT_KEY_LOCKED_REASON, reason);
         if(mDbg) log("Broadcasting intent ACTION_SIM_STATE_CHANGED " +  value
@@ -702,23 +737,23 @@ public class IccCard {
                     if (!is3gpp) {
                         handleCdmaSubscriptionSource();
                     }
-                    mPhone.mCM.getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE));
+                    mLtePhone.mCM.getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE));
                     break;
                 case EVENT_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
                     handleCdmaSubscriptionSource();
                     break;
                 case EVENT_ICC_READY:
                     if(isSubscriptionFromIccCard) {
-                        mPhone.mCM.queryFacilityLock (
+                        mLtePhone.mCM.queryFacilityLock (
                                 CommandsInterface.CB_FACILITY_BA_SIM, "", serviceClassX,
                                 obtainMessage(EVENT_QUERY_FACILITY_LOCK_DONE));
-                        mPhone.mCM.queryFacilityLock (
+                        mLtePhone.mCM.queryFacilityLock (
                                 CommandsInterface.CB_FACILITY_BA_FD, "", serviceClassX,
                                 obtainMessage(EVENT_QUERY_FACILITY_FDN_DONE));
                     }
                     break;
                 case EVENT_ICC_LOCKED:
-                    mPhone.mCM.queryFacilityLock (
+                    mLtePhone.mCM.queryFacilityLock (
                              CommandsInterface.CB_FACILITY_BA_SIM, "", serviceClassX,
                              obtainMessage(EVENT_QUERY_FACILITY_LOCK_DONE));
                      break;
@@ -735,7 +770,7 @@ public class IccCard {
                     // TODO should abstract these exceptions
                     AsyncResult.forMessage(((Message)ar.userObj)).exception
                                                         = ar.exception;
-                    mPhone.mCM.getIccCardStatus(
+                    mLtePhone.mCM.getIccCardStatus(
                         obtainMessage(EVENT_REPOLL_STATUS_DONE, ar.userObj));
                     break;
                 case EVENT_REPOLL_STATUS_DONE:
@@ -797,7 +832,7 @@ public class IccCard {
                     break;
                 case EVENT_ICC_STATUS_CHANGED:
                     Log.d(mLogTag, "Received Event EVENT_ICC_STATUS_CHANGED");
-                    mPhone.mCM.getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE));
+                    mLtePhone.mCM.getIccCardStatus(obtainMessage(EVENT_GET_ICC_STATUS_DONE));
                     break;
                 case EVENT_CARD_REMOVED:
                     onIccSwap(false);
@@ -994,4 +1029,26 @@ public class IccCard {
 
         return aid;
     }
+
+    public void setDualPhones(PhoneBase ltePhone, PhoneBase cdmaPhone){
+	Log.e(mLogTag, "ICC Dual Phone");
+	mLtePhone = ltePhone;
+	mCdmaPhone = cdmaPhone;
+    }
+
+    public static boolean isSMSFormat3GPP(){
+	return mIs3gpp;
+    }
+
+    private void setOperatorForMarket(){
+      Log.i(mLogTag, "setOperatorForMarket()");
+      String prop = SystemProperties.get("gsm.sim.state");
+	mPhone.setSystemProperty("gsm.sim.operator.numeric","310012");
+	mPhone.setSystemProperty("gsm.sim.operator.alpha","VzW");
+	mPhone.setSystemProperty("gsm.sim.operator.iso-country","us");
+	mLtePhone.setSystemProperty("gsm.sim.operator.numeric","310012");
+	mLtePhone.setSystemProperty("gsm.sim.operator.alpha","VzW");
+	mLtePhone.setSystemProperty("gsm.sim.operator.iso-country","us");
+    }
+	
 }

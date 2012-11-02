@@ -83,7 +83,7 @@ import static com.android.internal.telephony.TelephonyProperties.PROPERTY_ICC_OP
 public class CDMAPhone extends PhoneBase {
     static final String LOG_TAG = "CDMA";
     private static final boolean DBG = true;
-    private static final boolean VDBG = false; /* STOP SHIP if true */
+    private static final boolean VDBG = true; /* STOP SHIP if true */
 
     // Default Emergency Callback Mode exit timer
     private static final int DEFAULT_ECM_EXIT_TIMER_VALUE = 300000;
@@ -141,6 +141,7 @@ public class CDMAPhone extends PhoneBase {
     // Constructors
     public CDMAPhone(Context context, CommandsInterface ci, PhoneNotifier notifier) {
         super(notifier, context, ci, false);
+		//try {Thread.sleep(300);} catch (InterruptedException e) {}
         initSstIcc();
         init(context, notifier);
     }
@@ -148,6 +149,7 @@ public class CDMAPhone extends PhoneBase {
     public CDMAPhone(Context context, CommandsInterface ci, PhoneNotifier notifier,
             boolean unitTestMode) {
         super(notifier, context, ci, unitTestMode);
+		//try {Thread.sleep(300);} catch (InterruptedException e) {}
         initSstIcc();
         init(context, notifier);
     }
@@ -1170,7 +1172,8 @@ public class CDMAPhone extends PhoneBase {
      */
     @Override
     public boolean needsOtaServiceProvisioning() {
-        return mSST.getOtasp() != ServiceStateTracker.OTASP_NOT_NEEDED;
+        //return mSST.getOtasp() != ServiceStateTracker.OTASP_NOT_NEEDED;
+		return false;
     }
 
     private static final String IS683A_FEATURE_CODE = "*228";
@@ -1468,6 +1471,7 @@ public class CDMAPhone extends PhoneBase {
     }
 
     private void registerForRuimRecordEvents() {
+		log("registerforRuimRecordeEvents");
         mIccRecords.registerForRecordsEvents(this, EVENT_ICC_RECORD_EVENTS, null);
         mIccRecords.registerForRecordsLoaded(this, EVENT_RUIM_RECORDS_LOADED, null);
     }

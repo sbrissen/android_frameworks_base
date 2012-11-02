@@ -38,6 +38,9 @@ import com.android.internal.telephony.ims.IsimRecords;
 import com.android.internal.telephony.test.SimulatedRadioControl;
 import com.android.internal.telephony.CallManager;
 
+//import com.android.internal.telephony.MultiModePhoneProxy;
+import com.android.internal.telephony.cdma.CDMALTEPhone;
+
 import java.util.List;
 
 public class PhoneProxy extends Handler implements Phone {
@@ -48,29 +51,44 @@ public class PhoneProxy extends Handler implements Phone {
     private IccSmsInterfaceManagerProxy mIccSmsInterfaceManagerProxy;
     private IccPhoneBookInterfaceManagerProxy mIccPhoneBookInterfaceManagerProxy;
     private PhoneSubInfoProxy mPhoneSubInfoProxy;
+    private Phone mLtePhone;
+    private CommandsInterface mChargeCommandsInterface;
+    private IccSmsInterfaceManagerProxy mChargeIccSmsInterfaceManagerProxy;
+    private IccPhoneBookInterfaceManagerProxy mChargeIccPhoneBookInterfaceManagerProxy;
+    private PhoneSubInfoProxy mChargePhoneSubInfoProxy;
 
     private boolean mResetModemOnRadioTechnologyChange = false;
 
     private int mRilVersion;
 
-    private static final int EVENT_VOICE_RADIO_TECH_CHANGED = 1;
+	int mChargeVoiceTech;
+
+
+	//CommandsInterface mCommandsInterfaceCDMA;
+	//CommandsInterface mCommandsInterfaceGSM;
+	//Context mContext;
+	
+    protected static final int EVENT_VOICE_RADIO_TECH_CHANGED = 1;
     private static final int EVENT_RADIO_ON = 2;
     private static final int EVENT_REQUEST_VOICE_RADIO_TECH_DONE = 3;
     private static final int EVENT_RIL_CONNECTED = 4;
 
     private static final String LOG_TAG = "PHONE";
 
+    public PhoneProxy(){}
+
     //***** Class Methods
     public PhoneProxy(Phone phone) {
+	logd("sbrissen - PhoneProxy - 1");
         mActivePhone = phone;
-        mResetModemOnRadioTechnologyChange = SystemProperties.getBoolean(
+	mResetModemOnRadioTechnologyChange = SystemProperties.getBoolean(
                 TelephonyProperties.PROPERTY_RESET_ON_RADIO_TECH_CHANGE, false);
         mIccSmsInterfaceManagerProxy = new IccSmsInterfaceManagerProxy(
                 phone.getIccSmsInterfaceManager());
         mIccPhoneBookInterfaceManagerProxy = new IccPhoneBookInterfaceManagerProxy(
                 phone.getIccPhoneBookInterfaceManager());
         mPhoneSubInfoProxy = new PhoneSubInfoProxy(phone.getPhoneSubInfo());
-        mCommandsInterface = ((PhoneBase)mActivePhone).mCM;
+        mCommandsInterface = ((PhoneBase)phone).mCM;
 
         mCommandsInterface.registerForRilConnected(this, EVENT_RIL_CONNECTED, null);
         mCommandsInterface.registerForOn(this, EVENT_RADIO_ON, null);
@@ -78,14 +96,58 @@ public class PhoneProxy extends Handler implements Phone {
                              this, EVENT_VOICE_RADIO_TECH_CHANGED, null);
     }
 
+/*    public PhoneProxy(Phone cdmaPhone, Phone ltePhone, Context context){
+	mContext = context;
+
+        mResetModemOnRadioTechnologyChange = SystemProperties.getBoolean(
+                TelephonyProperties.PROPERTY_RESET_ON_RADIO_TECH_CHANGE, false);
+        mIccSmsInterfaceManagerProxy = new IccSmsInterfaceManagerProxy(
+                ltePhone.getIccSmsInterfaceManager());
+        mIccPhoneBookInterfaceManagerProxy = new IccPhoneBookInterfaceManagerProxy(
+                ltePhone.getIccPhoneBookInterfaceManager());
+        mPhoneSubInfoProxy = new PhoneSubInfoProxy(cdmaPhone.getPhoneSubInfo());
+
+		setLtePhone(ltePhone);
+		mActivePhone = cdmaPhone;
+		mGSMPhone = ltePhone;
+		meCDMAPhone = (CDMALTEPhone)cdmaPhone;
+		mLtePhone = (GSMPhone)ltePhone;     
+
+		mCommandsInterface = ((PhoneBase)cdmaPhone).mCM;
+		mCommandsInterfaceGSM = ((PhoneBase)ltePhone).mCM;
+
+        mCommandsInterface.registerForRilConnected(this, EVENT_RIL_CONNECTED, null);
+        mCommandsInterface.registerForOn(this, EVENT_RADIO_ON, null);
+        mCommandsInterface.registerForVoiceRadioTechChanged(
+                             this, EVENT_VOICE_RADIO_TECH_CHANGED, null);
+        mCommandsInterfaceGSM.registerForRilConnected(this, EVENT_RIL_CONNECTED, null);
+        mCommandsInterfaceGSM.registerForOn(this, EVENT_RADIO_ON, null);
+        mCommandsInterfaceGSM.registerForVoiceRadioTechChanged(
+                             this, EVENT_VOICE_RADIO_TECH_CHANGED, null);
+
+		handleActivePhoneSelection();
+		
+		mLtePhone.getIccCard().setDualPhones((PhoneBase)ltePhone,(PhoneBase)cdmaPhone);
+		meCDMAPhone.getIccCard().setDualPhones((PhoneBase)ltePhone,(PhoneBase)cdmaPhone);
+		
+    }*/
+
     @Override
     public void handleMessage(Message msg) {
         AsyncResult ar = (AsyncResult) msg.obj;
         switch(msg.what) {
         case EVENT_RADIO_ON:
-            /* Proactively query voice radio technologies */
+            /* Proactively query voice radio technologdes */
+			/*if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){		
+				logd("sbrissen - [PHONEPROXY] EVENT_RADIO_ON");			
+				logd("sbrissen - Active: " + mActivePhone.getPhoneName() + " : LtePhone: " + mLtePhone.getPhoneName());
+				mChargeVoiceTech = SamsungChargeRIL.getCDMAVoiceRadioTechnology();
+				updatePhoneObject(mChargeVoiceTech);
+				this.obtainMessage(EVENT_REQUEST_VOICE_RADIO_TECH_DONE);
+			}else{*/
             mCommandsInterface.getVoiceRadioTechnology(
                     this.obtainMessage(EVENT_REQUEST_VOICE_RADIO_TECH_DONE));
+			//}
             break;
 
         case EVENT_RIL_CONNECTED:
@@ -99,7 +161,9 @@ public class PhoneProxy extends Handler implements Phone {
 
         case EVENT_VOICE_RADIO_TECH_CHANGED:
         case EVENT_REQUEST_VOICE_RADIO_TECH_DONE:
-
+	   /* if(SystemProperties.getBoolean("ro.ril.droidCharge",true)){
+		updatePhoneObject(mChargeVoiceTech);
+	    }else{*/
             if (ar.exception == null) {
                 if ((ar.result != null) && (((int[]) ar.result).length != 0)) {
                     int newVoiceTech = ((int[]) ar.result)[0];
@@ -110,6 +174,7 @@ public class PhoneProxy extends Handler implements Phone {
             } else {
                 loge("Voice Radio Technology event " + msg.what + " exception!" + ar.exception);
             }
+	   // }
             break;
 
         default:
@@ -133,7 +198,8 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     private void updatePhoneObject(int newVoiceRadioTech) {
-
+      logd("sbrissen - Active: " + mActivePhone.getPhoneName());
+      //logd("sbrissen - LTE: " + mLtePhone.getPhoneName());
         if (mActivePhone != null) {
             if(mRilVersion == 6 && getLteOnCdmaMode() == Phone.LTE_ON_CDMA_TRUE) {
                 /*
@@ -179,6 +245,7 @@ public class PhoneProxy extends Handler implements Phone {
                 oldPowerState = true;
                 logd("Setting Radio Power to Off");
                 mCommandsInterface.setRadioPower(false, null);
+		//mCommandsInterfaceGSM.setRadioPower(false, null);
             }
         }
 
@@ -187,6 +254,7 @@ public class PhoneProxy extends Handler implements Phone {
         if (mResetModemOnRadioTechnologyChange && oldPowerState) { // restore power state
             logd("Resetting Radio");
             mCommandsInterface.setRadioPower(oldPowerState, null);
+	   // mCommandsInterfaceGSM.setRadioPower(oldPowerState, null);
         }
 
         // Set the new interfaces in the proxy's
@@ -197,17 +265,21 @@ public class PhoneProxy extends Handler implements Phone {
         mPhoneSubInfoProxy.setmPhoneSubInfo(this.mActivePhone.getPhoneSubInfo());
 
         mCommandsInterface = ((PhoneBase)mActivePhone).mCM;
+		
+		//mCommandsInterface = ((PhoneBase)meCDMAPhone).mCM;
+		//mCommandsInterfaceGSM = ((PhoneBase)mLtePhone).mCM;
 
         // Send an Intent to the PhoneApp that we had a radio technology change
         Intent intent = new Intent(TelephonyIntents.ACTION_RADIO_TECHNOLOGY_CHANGED);
         intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
         intent.putExtra(Phone.PHONE_NAME_KEY, mActivePhone.getPhoneName());
+	 //   intent.putExtra(Phone.PHONE_NAME_KEY, mLtePhone.getPhoneName());
         ActivityManagerNative.broadcastStickyIntent(intent, null);
 
     }
 
     private void deleteAndCreatePhone(int newVoiceRadioTech) {
-
+		logd("deleteAndCreatePhone()");
         String outgoingPhoneName = "Unknown";
         Phone oldPhone = mActivePhone;
 
@@ -233,8 +305,10 @@ public class PhoneProxy extends Handler implements Phone {
 
         if (ServiceState.isCdma(newVoiceRadioTech)) {
             mActivePhone = PhoneFactory.getCdmaPhone();
+			logd("sbrissen - mActivePhone = PhoneFactory.getCdmaPhone()");
         } else if (ServiceState.isGsm(newVoiceRadioTech)) {
             mActivePhone = PhoneFactory.getGsmPhone();
+	    logd("sbrissen - mLtePhone = PhoneFactory.getGsmPhone()");
         }
 
         if (oldPhone != null) {
@@ -257,6 +331,7 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public DataState getDataConnectionState() {
+	logd("sbrissen - PP - getDataConnectionState");
         return mActivePhone.getDataConnectionState(Phone.APN_TYPE_DEFAULT);
     }
 
@@ -378,10 +453,12 @@ public class PhoneProxy extends Handler implements Phone {
 
     public void registerForServiceStateChanged(Handler h, int what, Object obj) {
         mActivePhone.registerForServiceStateChanged(h, what, obj);
+	//mLtePhone.registerForServiceStateChanged(h, what, obj);
     }
 
     public void unregisterForServiceStateChanged(Handler h) {
         mActivePhone.unregisterForServiceStateChanged(h);
+	//mLtePhone.unregisterForServiceStateChanged(h);
     }
 
     public void registerForSuppServiceNotification(Handler h, int what, Object obj) {
@@ -426,10 +503,12 @@ public class PhoneProxy extends Handler implements Phone {
 
     public void registerForSubscriptionInfoReady(Handler h, int what, Object obj) {
         mActivePhone.registerForSubscriptionInfoReady(h, what, obj);
+	//mLtePhone.registerForSubscriptionInfoReady(h, what, obj);
     }
 
     public void unregisterForSubscriptionInfoReady(Handler h) {
         mActivePhone.unregisterForSubscriptionInfoReady(h);
+	//mLtePhone.unregisterForSubscriptionInfoReady(h);
     }
 
     public void registerForEcmTimerReset(Handler h, int what, Object obj) {
@@ -459,9 +538,9 @@ public class PhoneProxy extends Handler implements Phone {
     public boolean getIccRecordsLoaded() {
         return mActivePhone.getIccRecordsLoaded();
     }
-
+	
     public IccCard getIccCard() {
-        return mActivePhone.getIccCard();
+	return mLtePhone.getIccCard();
     }
 
     public void acceptCall() throws CallStateException {
@@ -545,7 +624,9 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void setRadioPower(boolean power) {
+	logd("setRadioPower-pp");
         mActivePhone.setRadioPower(power);
+	mLtePhone.setRadioPower(power);
     }
 
     public boolean getMessageWaitingIndicator() {
@@ -634,19 +715,23 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void setNetworkSelectionModeAutomatic(Message response) {
-        mActivePhone.setNetworkSelectionModeAutomatic(response);
+	//mLtePhone.setNetworkSelectionModeAutomatic(response);
+	mActivePhone.setNetworkSelectionModeAutomatic(response);
     }
 
     public void selectNetworkManually(OperatorInfo network, Message response) {
-        mActivePhone.selectNetworkManually(network, response);
+        //mLtePhone.selectNetworkManually(network, response);
+	mActivePhone.selectNetworkManually(network, response);
     }
 
     public void setPreferredNetworkType(int networkType, Message response) {
         mActivePhone.setPreferredNetworkType(networkType, response);
+	//mLtePhone.setPreferredNetworkType(networkType, response);
     }
 
     public void getPreferredNetworkType(Message response) {
         mActivePhone.getPreferredNetworkType(response);
+	//mLtePhone.getPreferredNetworkType(response);
     }
 
     public void getNeighboringCids(Message response) {
@@ -722,6 +807,7 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void setCdmaRoamingPreference(int cdmaRoamingType, Message response) {
+	logw("setCdmaRoamingPreference");
         mActivePhone.setCdmaRoamingPreference(cdmaRoamingType, response);
     }
 
@@ -734,6 +820,7 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public int enableApnType(String type) {
+	logd("sbrissen - PP - enableApnType");
         return mActivePhone.enableApnType(type);
     }
 
@@ -742,6 +829,7 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public boolean isDataConnectivityPossible() {
+	logd("sbrissen - PP - isDataPossible? ");
         return mActivePhone.isDataConnectivityPossible(Phone.APN_TYPE_DEFAULT);
     }
 
@@ -762,7 +850,7 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public String getIccSerialNumber() {
-        return mActivePhone.getIccSerialNumber();
+        return mLtePhone.getIccSerialNumber();
     }
 
     public String getEsn() {
@@ -934,11 +1022,11 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public IsimRecords getIsimRecords() {
-        return mActivePhone.getIsimRecords();
+	return mActivePhone.getIsimRecords();
     }
 
     public void requestIsimAuthentication(String nonce, Message response) {
-        mActivePhone.requestIsimAuthentication(nonce, response);
+          mLtePhone.requestIsimAuthentication(nonce, response);     
     }
 
     /**
@@ -964,17 +1052,78 @@ public class PhoneProxy extends Handler implements Phone {
 
     @Override
     public UsimServiceTable getUsimServiceTable() {
-        return mActivePhone.getUsimServiceTable();
+        return mLtePhone.getUsimServiceTable();
     }
 
     public void dispose() {
         mCommandsInterface.unregisterForOn(this);
         mCommandsInterface.unregisterForVoiceRadioTechChanged(this);
         mCommandsInterface.unregisterForRilConnected(this);
+       // mCommandsInterfaceGSM.unregisterForOn(this);
+       // mCommandsInterfaceGSM.unregisterForVoiceRadioTechChanged(this);
+       // mCommandsInterfaceGSM.unregisterForRilConnected(this);
+
     }
 
     public void removeReferences() {
         mActivePhone = null;
+	mLtePhone = null;
         mCommandsInterface = null;
+	//mCommandsInterfaceGSM = null;
     }
+
+    protected void setLtePhone(Phone ltePhone){
+      mLtePhone = ltePhone;
+      if(mIccPhoneBookInterfaceManagerProxy == null)
+	mIccPhoneBookInterfaceManagerProxy = new IccPhoneBookInterfaceManagerProxy(mLtePhone.getIccPhoneBookInterfaceManager());
+      }
+
+    protected void setActivePhone(Phone phoneType){
+      mActivePhone = phoneType;
+    }
+
+/*	private void SelectActivePhone(String mode){
+		loge("Active Phone call from SelectActivePhone, bCastReceived: " + mode.toString());
+		int modeVal = handleActivePhoneSelection();
+		mActivePhone.setPreferredNetworkType(modeVal, null);
+		mLtePhone.setPreferredNetworkType(modeVal, null);
+	}
+	
+	private int handleActivePhoneSelection(){
+		int mode = getNetworkSelectionMode();
+		
+		switch(mode){
+			case 9:
+				mActivePhone = meCDMAPhone;
+				
+				loge("Active Phone in MMproxy is meCDMAPhone");
+				break;
+			case 8:
+				mActivePhone = mLtePhone;
+				
+				loge("Active Phone in MMproxy is mLTEPhone");
+				break;
+			default:
+				loge("Not Supported Network Mode");
+				break;
+		}
+		setActivePhone(mActivePhone);
+
+		return mode;
+	}
+
+	public int getNetworkSelectionMode(){
+		int retMode = -1;
+		setNetworkSelectionMode(mmsAp.getModeType());
+		
+		if(mNetworkSelectionMode.equals("LTE")){
+			retMode = 8;
+		}else if(mNetworkSelectionMode.equals("CDMA")){
+			retMode = 9;
+		}else if(mNetworkSelectionMode.equals("GLOBAL")){
+			retMode = 7;
+		}
+		logd("GetNetworkSelectionMode");
+		return 9;
+	}*/
 }

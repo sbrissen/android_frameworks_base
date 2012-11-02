@@ -87,6 +87,7 @@ class RILRequest {
     Message mResult;
     Parcel mp;
     RILRequest mNext;
+    
 
     /**
      * Retrieves a new RILRequest instance from the pool.
@@ -260,6 +261,8 @@ public class RIL extends BaseCommands implements CommandsInterface {
     static final int RESPONSE_UNSOLICITED = 1;
 
     static final String SOCKET_NAME_RIL = "rild";
+    static final String SOCKET_NAME_RIL_EXT = "rildext";
+    public static int mChargePhoneType = 0;
 
     static final int SOCKET_OPEN_RETRY_MILLIS = 4 * 1000;
 
@@ -268,6 +271,10 @@ public class RIL extends BaseCommands implements CommandsInterface {
     private static final int CDMA_BSI_NO_OF_INTS_STRUCT = 3;
 
     private static final int CDMA_BROADCAST_SMS_NO_OF_SERVICE_CATEGORIES = 31;
+
+    public static void setChargePhone(int type){
+      mChargePhoneType = type;
+    }
 
     BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
@@ -475,7 +482,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
      * @return Length of message less header, or -1 on end of stream.
      * @throws IOException
      */
-    private static int readRilMessage(InputStream is, byte[] buffer)
+    protected static int readRilMessage(InputStream is, byte[] buffer)
             throws IOException {
         int countRead;
         int offset;
@@ -538,8 +545,14 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
                 try {
                     s = new LocalSocket();
+					Log.i(LOG_TAG, "mChargePhoneType: " + mChargePhoneType);
+		    if(mChargePhoneType == 2){
+                    l = new LocalSocketAddress(SOCKET_NAME_RIL_EXT,
+                            LocalSocketAddress.Namespace.RESERVED);	
+		    }else{
                     l = new LocalSocketAddress(SOCKET_NAME_RIL,
                             LocalSocketAddress.Namespace.RESERVED);
+		    }
                     s.connect(l);
                 } catch (IOException ex){
                     try {
@@ -576,7 +589,11 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 retryCount = 0;
 
                 mSocket = s;
+		    if(mChargePhoneType == 2){
+                Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL_EXT + "' socket");
+		    }else{
                 Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
+		    }
 
                 int length = 0;
                 try {
@@ -596,7 +613,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                         p.unmarshall(buffer, 0, length);
                         p.setDataPosition(0);
 
-                        //Log.v(LOG_TAG, "Read packet: " + length + " bytes");
+                        Log.v(LOG_TAG, "Read packet: " + length + " bytes");
 
                         processResponse(p);
                         p.recycle();
@@ -647,7 +664,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
         mPreferredNetworkType = preferredNetworkType;
         mSetPreferredNetworkType = preferredNetworkType;
         mPhoneType = RILConstants.NO_PHONE;
-
+			
         PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
         mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, LOG_TAG);
         mWakeLock.setReferenceCounted(false);
@@ -947,16 +964,12 @@ public class RIL extends BaseCommands implements CommandsInterface {
     getIMSIForApp(String aid, Message result) {
         RILRequest rr = RILRequest.obtain(RIL_REQUEST_GET_IMSI, result);
 
-        boolean skipNullAid = needsOldRilFeature("skipnullaid");
-        boolean writeAidOnly = needsOldRilFeature("writeaidonly");
+        boolean oldRil = needsOldRilFeature("skipnullaid");
 
-        if (!writeAidOnly && (aid != null || !skipNullAid)) {
+        if (aid != null || !oldRil) {
             rr.mp.writeInt(1);
             rr.mp.writeString(aid);
         }
-
-        if (writeAidOnly)
-            rr.mp.writeString(aid);
 
         if (RILJ_LOGD) riljLog(rr.serialString() +
                               "> getIMSI: " + requestToString(rr.mRequest)

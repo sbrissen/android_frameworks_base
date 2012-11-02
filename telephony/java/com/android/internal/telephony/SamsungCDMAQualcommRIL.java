@@ -60,6 +60,8 @@ CommandsInterface {
         super(context, networkMode, cdmaSubscription);
     }
 
+    static final int RIL_UNSOL_DEVICE_READY_NOTI = 11008;
+
     @Override
     public void
     sendCdmaSms(byte[] pdu, Message result) {
@@ -97,7 +99,7 @@ CommandsInterface {
         status.setGsmUmtsSubscriptionAppIndex(p.readInt());
         status.setCdmaSubscriptionAppIndex(p.readInt());
 
-        status.setImsSubscriptionAppIndex(p.readInt());
+       // status.setImsSubscriptionAppIndex(p.readInt());
 
         int numApplications = p.readInt();
 
@@ -309,4 +311,28 @@ CommandsInterface {
 
         return super.responseSMS(p);
     }
+
+    @Override
+    protected void
+    processUnsolicited (Parcel p) {
+        int response;
+        Object ret;
+	int dataPosition = p.dataPosition();
+
+        response = p.readInt();
+
+        switch(response) {
+	  case RIL_UNSOL_DEVICE_READY_NOTI: ret = responseVoid(p); break;
+	  
+	  default:
+            // Rewind the Parcel
+            p.setDataPosition(dataPosition);
+
+            // Forward responses that we are not overriding to the super class
+            super.processUnsolicited(p);
+            return;
+	}
+    }
+
+	
 }
