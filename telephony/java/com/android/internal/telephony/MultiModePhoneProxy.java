@@ -26,8 +26,12 @@ import com.android.internal.telephony.ServiceStateTracker;
 import com.android.internal.telephony.ims.IsimRecords;
 import com.android.internal.telephony.SamsungChargeRIL;
 import com.android.internal.telephony.RIL;
+import android.telephony.SignalStrength;
 
 import java.util.List;
+import java.io.IOException;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 
 public class MultiModePhoneProxy extends PhoneProxy {
 
@@ -48,22 +52,46 @@ public class MultiModePhoneProxy extends PhoneProxy {
 	int mPendingPreferredNetworkCnt;
 	PhoneStateListener mPhoneStateListener;
 	int mRadioTechnology;
+	private int oldBatteryLevel = -1;
+	private int oldBatteryPlugStatus = -1;
 
     protected static final int EVENT_VOICE_RADIO_TECH_CHANGED = 1;
     private static final int EVENT_RADIO_ON = 2;
     private static final int EVENT_REQUEST_VOICE_RADIO_TECH_DONE = 3;
     private static final int EVENT_RIL_CONNECTED = 4;
     protected static final int EVENT_SIM_RECORDS_LOADED                = 16;
+    private static int EVENT_VIA_RESET_DONE = 0x24;
+    private static int EVENT_LTE_RESET_DONE = 0x23;
     
 
 	public MultiModePhoneProxy(Phone cdmaPhone, Phone ltePhone, Context context){
 		super(cdmaPhone);
+
+	  BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
+	  @Override
+	   public void onReceive(Context context, Intent intent) {
+	      if (intent.getAction().equals("android.intent.action.BATTERY_CHANGED")) {
+                sendBatteryInfo(intent);
+	      }
+	     }
+	   };
+
+	   /* PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
+	      public void onDataConnectionStateChanged(int state, int networkType){
+		int cdmaDataState = meCDMAPhone.getDataRegistrationState();
+		int lteDataState = mLtePhone.getDataRegistrationState();
+		logd("cdmaDataState: " + cdmaDataState + ", lteDataState: " + lteDataState);
+		//if(lteDataState = 0){
+	      }
+	    };*/
+
 		logd("MultiModePhoneProxy");		
 		setLtePhone(ltePhone);
 		mActivePhone = cdmaPhone;
 		meCDMAPhone = (CDMAPhone)cdmaPhone;
 		mLtePhone = (GSMPhone)ltePhone;     
-		mActivePhone = meCDMAPhone;
+
+		setActivePhone(mActivePhone);
 		//mRadioTechnology = SamsungChargeRIL.getPreferredNetwork();
 
 		mCommandsInterfaceCDMA = ((PhoneBase)cdmaPhone).mCM;
@@ -82,6 +110,10 @@ public class MultiModePhoneProxy extends PhoneProxy {
 		meCDMAPhone.getIccCard().setDualPhones((PhoneBase)ltePhone,(PhoneBase)cdmaPhone);
 
 		mLtePhone.mIccRecords.registerForRecordsLoaded(meCDMAPhone.mDataConnectionTracker,EVENT_SIM_RECORDS_LOADED,mLtePhone.mIccRecords);
+
+	    IntentFilter filter = new IntentFilter();
+	    filter.addAction("android.intent.action.BATTERY_CHANGED");
+	    context.registerReceiver(mIntentReceiver,filter);
 	}
 	
 	private void SelectActivePhone(int radioTech){
@@ -186,12 +218,6 @@ public class MultiModePhoneProxy extends PhoneProxy {
 		return mActivePhone.enableApnType(type);
 	}
 
-        @Override
-	public String[] getActiveApnTypes(){
-		return mActivePhone.getActiveApnTypes();
-	}
-
-
 	public DataState getActiveDataConnectionState(){
 		return getDataConnectionState();
 	}
@@ -234,13 +260,13 @@ public class MultiModePhoneProxy extends PhoneProxy {
 		return mActivePhone.getDataConnectionState();
 	}*/
 	
-	public Phone getDataPhone(){
+/*	public Phone getDataPhone(){
 		if(mRadioTechnology == 0xd){
 			return mLtePhone;
 		}else{
 			return meCDMAPhone;
 		}
-	}
+	}*/
 	
 /*	public int getDataPhoneType(){
 		logd("getDataPhoneType");
@@ -250,8 +276,8 @@ public class MultiModePhoneProxy extends PhoneProxy {
 
 	@Override
 	public boolean getDataRoamingEnabled(){
-	      logd("getDataRoamingEnabled: " + mActivePhone.getDataRoamingEnabled());
-		return mActivePhone.getDataRoamingEnabled();
+	      logd("getDataRoamingEnabled: " + mLtePhone.getDataRoamingEnabled());
+		return mLtePhone.getDataRoamingEnabled();
 	}
 	
 	public GSMPhone getGsmPhone(){
@@ -277,7 +303,7 @@ public class MultiModePhoneProxy extends PhoneProxy {
 
     @Override
     public void setNetworkSelectionModeAutomatic(Message response) {
-	//mLtePhone.setNetworkSelectionModeAutomatic(response);
+	mLtePhone.setNetworkSelectionModeAutomatic(response);
 	mActivePhone.setNetworkSelectionModeAutomatic(response);
 	//SelectActivePhone(0);
     }
@@ -315,18 +341,18 @@ public class MultiModePhoneProxy extends PhoneProxy {
 		logd("getSubsciberId()");
 		return mLtePhone.getSubscriberId();
 	}*/
-    @Override
+/*    @Override
     public void setRadioPower(boolean power) {
 	logd("setRadioPower");
         mActivePhone.setRadioPower(power);
 	mLtePhone.setRadioPower(power);
-    }
+    }*/
 
     @Override
     public boolean getIccRecordsLoaded() {
 	logd("getIccRecordsLoaded");
 	
-        return mLtePhone.getIccRecordsLoaded();
+        return mActivePhone.getIccRecordsLoaded();
     }
 
     @Override
@@ -344,10 +370,140 @@ public class MultiModePhoneProxy extends PhoneProxy {
 
     @Override
     public IsimRecords getIsimRecords() {
+	logd("getIsimRecords - mmpp");
 	return mLtePhone.getIsimRecords();
     }
 
-	
+    private void sendBatteryInfo(Intent intent){
+	int BatteryPlugStatus = intent.getIntExtra("plugged", 0);
+	int BatteryLevel = intent.getIntExtra("level",100);
+	boolean plugChanged = false;
+	boolean isTaCharging = false;
+
+
+	logd("BATTERY CHANGED - plugged: " + BatteryPlugStatus + ", level: " + BatteryLevel + ", old_level: " + oldBatteryLevel);
+
+	if(oldBatteryPlugStatus != BatteryPlugStatus){
+	    logd("sendBatteryInfo CHANGED!");
+	    plugChanged = true;
+	}
+	if(plugChanged){
+	  ByteArrayOutputStream bos = new ByteArrayOutputStream();
+	  DataOutputStream dos = new DataOutputStream(bos);
+	  if(BatteryPlugStatus == 1){
+	    isTaCharging = true;
+	  }
+	  try{
+	    dos.writeByte(23);
+	    dos.writeByte(1);
+	   // dos.writeByte(0);
+	    dos.writeShort(5);
+	    
+	    if(isTaCharging){
+	      dos.writeByte(1);
+	    }else{
+	      dos.writeByte(0);
+	    }
+	    mCommandsInterfaceCDMA.invokeOemRilRequestRaw(bos.toByteArray(),null);
+	    dos.close();
+	  }catch(IOException ioe){
+	    logd("ioexception");
+	  }
+	}
+	  ByteArrayOutputStream bos2 = new ByteArrayOutputStream();
+	  DataOutputStream dos2 = new DataOutputStream(bos2);
+	  String string = "UNKNOWN";
+	  int fileSize = (string.length() + 4) + 1;
+	  int mainCmdPhone = 0x10;
+	  int subCmdPhoneReset = 0x2;
+
+	/*  try{
+	    dos2.writeByte(mainCmdPhone);
+	    dos2.writeByte(subCmdPhoneReset);
+	    dos2.writeShort(fileSize);
+	    dos2.writeBytes("UNKNOWN");
+	    dos2.writeByte(0x0);
+	   }catch(IOException ioe){
+	      logd("ioexceptio3");
+	   }
+	    mCommandsInterfaceGSM.invokeOemRilRequestRaw(bos2.toByteArray(),this.obtainMessage(0x23));
+	    mCommandsInterfaceCDMA.invokeOemRilRequestRaw(bos2.toByteArray(),this.obtainMessage(0x24));
+	    
+	*/
+	if(oldBatteryLevel < 0){
+	  oldBatteryLevel = BatteryLevel;
+	}
+	if(oldBatteryLevel < 5 || BatteryLevel >= 5){
+	  ByteArrayOutputStream bos = new ByteArrayOutputStream();
+	  DataOutputStream dos = new DataOutputStream(bos);
+	  logd("Battery at normal level");
+	  try{
+	    dos.writeByte(23);
+	    dos.writeByte(2);
+	    dos.writeShort(5);
+	    dos.writeByte(BatteryLevel);
+	    mCommandsInterfaceGSM.invokeOemRilRequestRaw(bos.toByteArray(), null);
+	    dos.close();
+	  }catch(IOException ioe){
+	    logd("ioexception2");
+	  }
+	}
+
+	oldBatteryLevel = BatteryLevel;
+	oldBatteryPlugStatus = BatteryPlugStatus;
+      }
+	  
+@Override
+    public DataState getDataConnectionState() {
+	logd("sbrissen - MMPP - getDataConnectionState");
+        return mLtePhone.getDataConnectionState(Phone.APN_TYPE_DEFAULT);
+    }
+
+@Override
+    public DataState getDataConnectionState(String apnType) {
+logd("sbrissen - MMPP - getDataConnectionState2");
+        return mLtePhone.getDataConnectionState(apnType);
+    }
+
+@Override
+    public DataActivityState getDataActivityState() {
+logd("sbrissen - MMPP - getDataActivityState");
+        return mLtePhone.getDataActivityState();
+    }
+
+@Override
+    public String[] getActiveApnTypes() {
+logd("sbrissen - MMPP - getActiveApnTypes");
+        return mLtePhone.getActiveApnTypes();
+    }
+
+@Override
+    public String getActiveApnHost(String apnType) {
+logd("sbrissen - MMPP - getActiveApnHost");
+        return mLtePhone.getActiveApnHost(apnType);
+    }
+
+@Override
+    public LinkProperties getLinkProperties(String apnType) {
+logd("sbrissen - MMPP - getLinkProperties");
+        return mLtePhone.getLinkProperties(apnType);
+    }
+
+@Override
+    public LinkCapabilities getLinkCapabilities(String apnType) {
+logd("sbrissen - MMPP - getLinkCapabilities");
+        return mLtePhone.getLinkCapabilities(apnType);	
+    }
+@Override
+    public boolean isDataConnectivityPossible() {
+	logd("sbrissen - MMPP - isDataPossible? ");
+        return mLtePhone.isDataConnectivityPossible(Phone.APN_TYPE_DEFAULT);
+    }
+@Override
+    public boolean isDataConnectivityPossible(String apnType) {
+	logd("sbrissen - MMPP - isDataPossible2? ");
+        return mLtePhone.isDataConnectivityPossible(apnType);
+    }
 		
 }	
 	

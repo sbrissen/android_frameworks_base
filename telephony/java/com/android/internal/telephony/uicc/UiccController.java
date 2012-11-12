@@ -77,11 +77,10 @@ public class UiccController {
             return;
         }
 
-        if (mIccCard != null) {
-           //mIccCard.dispose();
-          // mIccCard = null;
-	   // return;
-        }
+       /* if (mIccCard != null) {
+           mIccCard.dispose();
+           mIccCard = null;
+        }*/
 
         mIsCurrentCard3gpp = isNewCard3gpp;
         mIccCard = new IccCard(mCurrentPhone, mCurrentPhone.getPhoneName(),

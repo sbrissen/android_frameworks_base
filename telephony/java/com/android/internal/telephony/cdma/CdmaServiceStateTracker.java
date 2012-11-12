@@ -167,8 +167,6 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
     public CdmaServiceStateTracker(CDMAPhone phone) {
         super();
 
-	log("sbrissen - cdmaServiceStateTracker");
-
         this.phone = phone;
         cr = phone.getContext().getContentResolver();
         cm = phone.mCM;
@@ -322,10 +320,8 @@ public class CdmaServiceStateTracker extends ServiceStateTracker {
             break;
 
         case EVENT_RADIO_STATE_CHANGED:
-	    log("sbrissen - EVENT_RADIO_STATE_CHANGED");
             if(cm.getRadioState() == RadioState.RADIO_ON) {
-				log("sbrissen - event_radio_state_changed");
-						handleCdmaSubscriptionSource(mCdmaSSM.getCdmaSubscriptionSource());
+		handleCdmaSubscriptionSource(mCdmaSSM.getCdmaSubscriptionSource());
 
                 // Signal strength polling stops when radio is off.
                 queueNextSignalStrengthPoll();

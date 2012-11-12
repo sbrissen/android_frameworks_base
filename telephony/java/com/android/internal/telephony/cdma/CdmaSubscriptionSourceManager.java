@@ -60,8 +60,6 @@ public class CdmaSubscriptionSourceManager extends Handler {
     private CommandsInterface mCM;
     private Context mContext;
     private RegistrantList mCdmaSubscriptionSourceChangedRegistrants = new RegistrantList();
-	
-	int mChargeSource = 0;
 
     // Type of CDMA subscription source
     private AtomicInteger mCdmaSubscriptionSource = new AtomicInteger(SUBSCRIPTION_FROM_NV);

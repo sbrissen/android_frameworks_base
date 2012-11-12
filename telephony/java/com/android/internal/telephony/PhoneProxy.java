@@ -64,9 +64,6 @@ public class PhoneProxy extends Handler implements Phone {
 	
 	int mChargeVoiceTech;
 
-	int mChargeVoiceTech;
-
-
 	//CommandsInterface mCommandsInterfaceCDMA;
 	//CommandsInterface mCommandsInterfaceGSM;
 	//Context mContext;
@@ -466,19 +463,19 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public void registerForSuppServiceNotification(Handler h, int what, Object obj) {
-        mActivePhone.registerForSuppServiceNotification(h, what, obj);
+        mLtePhone.registerForSuppServiceNotification(h, what, obj);
     }
 
     public void unregisterForSuppServiceNotification(Handler h) {
-        mActivePhone.unregisterForSuppServiceNotification(h);
+        mLtePhone.unregisterForSuppServiceNotification(h);
     }
 
     public void registerForSuppServiceFailed(Handler h, int what, Object obj) {
-        mActivePhone.registerForSuppServiceFailed(h, what, obj);
+        mLtePhone.registerForSuppServiceFailed(h, what, obj);
     }
 
     public void unregisterForSuppServiceFailed(Handler h) {
-        mActivePhone.unregisterForSuppServiceFailed(h);
+        mLtePhone.unregisterForSuppServiceFailed(h);
     }
 
     public void registerForInCallVoicePrivacyOn(Handler h, int what, Object obj){
@@ -507,12 +504,12 @@ public class PhoneProxy extends Handler implements Phone {
 
     public void registerForSubscriptionInfoReady(Handler h, int what, Object obj) {
         mActivePhone.registerForSubscriptionInfoReady(h, what, obj);
-	//mLtePhone.registerForSubscriptionInfoReady(h, what, obj);
+	mLtePhone.registerForSubscriptionInfoReady(h, what, obj);
     }
 
     public void unregisterForSubscriptionInfoReady(Handler h) {
         mActivePhone.unregisterForSubscriptionInfoReady(h);
-	//mLtePhone.unregisterForSubscriptionInfoReady(h);
+	mLtePhone.unregisterForSubscriptionInfoReady(h);
     }
 
     public void registerForEcmTimerReset(Handler h, int what, Object obj) {
@@ -630,7 +627,7 @@ public class PhoneProxy extends Handler implements Phone {
     public void setRadioPower(boolean power) {
 	logd("setRadioPower-pp");
         mActivePhone.setRadioPower(power);
-	mLtePhone.setRadioPower(power);
+	//mLtePhone.setRadioPower(power);
     }
 
     public boolean getMessageWaitingIndicator() {
@@ -817,6 +814,7 @@ public class PhoneProxy extends Handler implements Phone {
 
     public void setCdmaSubscription(int cdmaSubscriptionType, Message response) {
         mActivePhone.setCdmaSubscription(cdmaSubscriptionType, response);
+	mLtePhone.setCdmaSubscription(cdmaSubscriptionType, response);
     }
 
     public SimulatedRadioControl getSimulatedRadioControl() {
@@ -825,7 +823,7 @@ public class PhoneProxy extends Handler implements Phone {
 
     public int enableApnType(String type) {
 	logd("sbrissen - PP - enableApnType");
-        return mActivePhone.enableApnType(type);
+        return mLtePhone.enableApnType(type);
     }
 
     public int disableApnType(String type) {
@@ -866,7 +864,7 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public String getMsisdn() {
-        return mActivePhone.getMsisdn();
+        return mLtePhone.getMsisdn();
     }
 
     public String getImei() {
@@ -907,6 +905,7 @@ public class PhoneProxy extends Handler implements Phone {
 
     public void notifyDataActivity() {
          mActivePhone.notifyDataActivity();
+	  mLtePhone.notifyDataActivity();
     }
 
     public void getSmscAddress(Message result) {
@@ -1026,7 +1025,8 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     public IsimRecords getIsimRecords() {
-	return mActivePhone.getIsimRecords();
+	logd("getIsimRecords - pp");
+	return mLtePhone.getIsimRecords();
     }
 
     public void requestIsimAuthentication(String nonce, Message response) {
@@ -1073,7 +1073,6 @@ public class PhoneProxy extends Handler implements Phone {
         mActivePhone = null;
 	mLtePhone = null;
         mCommandsInterface = null;
-	//mCommandsInterfaceGSM = null;
     }
 
     protected void setLtePhone(Phone ltePhone){

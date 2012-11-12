@@ -171,7 +171,7 @@ public class PhoneFactory {
 		Log.i(LOG_TAG, "3 Creating CDMAPhone");
 		sProxyPhone = new CDMAPhone(context, sCommandsInterface[1], sPhoneNotifier);
 		Log.i(LOG_TAG, "3 Creating GSMPhone");
-		sProxyPhoneGSM = new GSMPhone(context, sCommandsInterface[0], sPhoneNotifier);	
+		sProxyPhoneGSM = new GSMPhone(context, sCommandsInterface[0], sPhoneNotifier);
 			
 		mMultiProxyPhone = new MultiModePhoneProxy(sProxyPhone, sProxyPhoneGSM, sContext);
                 /*if (phoneType == Phone.PHONE_TYPE_GSM) {
@@ -257,18 +257,18 @@ public class PhoneFactory {
        // Phone phone;
         synchronized(PhoneProxy.lockForRadioTechnologyChange) {
 	  if(sProxyPhone == null){
-            switch (BaseCommands.getLteOnCdmaModeStatic()) {
+           /* switch (BaseCommands.getLteOnCdmaModeStatic()) {
                 case Phone.LTE_ON_CDMA_TRUE: {
                     sProxyPhone = new CDMALTEPhone(sContext, sCommandsInterface[1], sPhoneNotifier);
                     break;
                 }
                 case Phone.LTE_ON_CDMA_FALSE:
                 case Phone.LTE_ON_CDMA_UNKNOWN:
-                default: {
+                default: {*/
                     sProxyPhone = new CDMAPhone(sContext, sCommandsInterface[1], sPhoneNotifier);
-                    break;
-                }
-            }
+                  //  break;
+              //  }
+            //}
 	  }
 	}
 
@@ -283,7 +283,7 @@ public class PhoneFactory {
             sProxyPhoneGSM = new GSMPhone(sContext, sCommandsInterface[0], sPhoneNotifier);
 	  }
 
-            return sProxyPhone;
+            return sProxyPhoneGSM;
         }
     }
 

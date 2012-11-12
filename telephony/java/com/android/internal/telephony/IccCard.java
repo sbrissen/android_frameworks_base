@@ -865,7 +865,7 @@ public class IccCard {
 
     public State getIccCardState() {
         if(!is3gpp && !isSubscriptionFromIccCard) {
-			Log.i(mLogTag, "sbrissen - getIccCardState();");
+			Log.i(mLogTag, "sbrissen - NV: getIccCardState();");
             // CDMA can get subscription from NV. In that case,
             // subscription is ready as soon as Radio is ON.
             return State.READY;
